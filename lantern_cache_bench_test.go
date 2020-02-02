@@ -122,7 +122,6 @@ func newLTCache(bucketCount uint32, maxCapacity uint64, allocatorPolicy string) 
 
 func runCacheBenchmark(b *testing.B, cache Cache, keys [][]byte, vals [][]byte, pctWrites uint64) {
 	b.ReportAllocs()
-
 	size := len(keys)
 	mask := size - 1
 	rc := uint64(0)
