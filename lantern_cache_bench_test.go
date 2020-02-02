@@ -90,11 +90,13 @@ func newSyncMap() *SyncMap {
 //========================================================================
 
 type LTCache struct {
-	c *LanternCache
+	c   *LanternCache
+	buf []byte
 }
 
 func (b *LTCache) Get(key []byte) ([]byte, error) {
-	return b.c.Get(key)
+	//return b.c.Get(key)
+	return b.c.GetWithBuffer(b.buf, key)
 }
 
 func (b *LTCache) Set(key, value []byte) error {
@@ -108,12 +110,12 @@ func newLTCache(bucketCount uint32, maxCapacity uint64, allocatorPolicy string) 
 		MaxCapacity:          maxCapacity,
 		InitCapacity:         maxCapacity / 4,
 	})
-
+	buf := make([]byte, 0, 2048)
 	for i := 0; i < 2*workloadSize; i++ {
 		cache.Put([]byte(strconv.Itoa(i)), []byte("data"))
 	}
 	cache.Reset()
-	return &LTCache{cache}
+	return &LTCache{cache, buf}
 }
 
 //========================================================================
@@ -172,11 +174,11 @@ func BenchmarkCaches(b *testing.B) {
 		{1, G, "heap", 32, 256, 0},
 		{512, G, "heap", 32, 256, 0},
 		{1024, G, "heap", 32, 256, 0},
-
+		//
 		{1, G, "heap", 32, 512, 0},
 		{512, G, "heap", 32, 512, 0},
 		{1024, G, "heap", 32, 512, 0},
-
+		//
 		{1, G, "heap", 32, K, 0},
 		{512, G, "heap", 32, K, 0},
 		{1024, G, "heap", 32, K, 0},

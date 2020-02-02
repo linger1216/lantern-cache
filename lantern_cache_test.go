@@ -47,6 +47,26 @@ func TestLanternCachePutGet(t *testing.T) {
 	}
 }
 
+func TestLanternCachePutGetWithBuffer(t *testing.T) {
+	buf := make([]byte, 0, 64)
+	b := NewLanternCache(nil)
+	for i := 0; i < 10000; i++ {
+		key := []byte(fmt.Sprintf("key%d", i))
+		val := []byte(fmt.Sprintf("val%d", i))
+		err := b.Put(key, val)
+		if err != nil {
+			t.Fatal(err)
+		}
+		actual, err := b.GetWithBuffer(buf, key)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !bytes.Equal(actual, val) {
+			t.Fatal("not equal")
+		}
+	}
+}
+
 func TestLanternCachePutGetExpire(t *testing.T) {
 	b := NewLanternCache(nil)
 	key1 := []byte("key1")

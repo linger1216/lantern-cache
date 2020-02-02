@@ -24,6 +24,8 @@ type bucket struct {
 	stats      *Stats
 }
 
+var FixBlob []byte
+
 func newBucket(cfg *bucketConfig) *bucket {
 	assert(cfg.maxCapacity > 0, "bucket max capacity need > 0")
 	if cfg.initCapacity == 0 {
@@ -53,6 +55,8 @@ func newBucket(cfg *bucketConfig) *bucket {
 		}
 		ret.chunks[i] = chunk
 	}
+
+	FixBlob = make([]byte, 0, 4096)
 	return ret
 }
 

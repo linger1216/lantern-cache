@@ -97,6 +97,17 @@ func (lc *LanternCache) Get(key []byte) ([]byte, error) {
 	return v, nil
 }
 
+func (lc *LanternCache) GetWithBuffer(dst []byte, key []byte) ([]byte, error) {
+	keyHash := lc.hash.Hash(key)
+	bucketIndex := keyHash & lc.bucketMask
+	bucket := lc.buckets[bucketIndex]
+	v, err := bucket.get(dst, keyHash, key)
+	if err != nil {
+		return nil, err
+	}
+	return v, nil
+}
+
 func (lc *LanternCache) Del(key []byte) {
 	keyHash := lc.hash.Hash(key)
 	bucketIndex := keyHash & lc.bucketMask
