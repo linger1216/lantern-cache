@@ -13,7 +13,7 @@ type Stats struct {
 }
 
 func (s *Stats) String() string {
-	return fmt.Sprintf("hit:%f err:%f collisions:%f cap:%s",
+	return fmt.Sprintf("hit:%f err:%f collisions:%f bytes:%s",
 		float32(s.Hits)/float32(s.GetCalls),
 		float32(s.Errors)/float32(s.GetCalls+s.PutCalls),
 		float32(s.Collisions)/float32(s.GetCalls+s.PutCalls),
@@ -21,7 +21,7 @@ func (s *Stats) String() string {
 }
 
 func (s *Stats) Raw() string {
-	return fmt.Sprintf("get:%d put:%d err:%d hit:%d miss:%d mem:%s collisions:%d",
+	return fmt.Sprintf("get:%d put:%d err:%d hit:%d miss:%d bytes:%s collisions:%d",
 		s.GetCalls,
 		s.PutCalls,
 		s.Errors,
