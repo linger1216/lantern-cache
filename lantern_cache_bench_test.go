@@ -137,15 +137,20 @@ func runCacheBenchmark(b *testing.B, cache Cache, keys [][]byte, vals [][]byte, 
 	b.RunParallel(func(pb *testing.PB) {
 		index := rand.Int() & mask
 		mc := atomic.AddUint64(&rc, 1)
-
 		if pctWrites*mc/100 != pctWrites*(mc-1)/100 {
 			for pb.Next() {
-				_ = cache.Set(keys[index&mask], vals[index&mask])
+				err := cache.Set(keys[index&mask], vals[index&mask])
+				if err != nil {
+					b.Fail()
+				}
 				index = index + 1
 			}
 		} else {
 			for pb.Next() {
-				_, _ = cache.Get(keys[index&mask])
+				_, err := cache.Get(keys[index&mask])
+				if err != nil && err != ErrorNotFound && err != ErrorValueExpire {
+					b.Fail()
+				}
 				index = index + 1
 			}
 		}
