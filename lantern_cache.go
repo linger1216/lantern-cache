@@ -61,7 +61,7 @@ func newLanternCache(cfg *Config) *LanternCache {
 		maxCapacity:  bucketMaxCapacity,
 		initCapacity: bucketInitCapacity,
 		chunkAlloc:   chunkAlloc,
-		stats:        ret.stats,
+		statistics:   ret.stats,
 	}
 	for i := range ret.buckets {
 		ret.buckets[i] = newBucket(bc)
@@ -123,4 +123,16 @@ func (lc *LanternCache) Reset() {
 
 func (lc *LanternCache) Stats() *Stats {
 	return lc.stats
+}
+
+func (lc *LanternCache) String() string {
+	var mapLen, mapSize, chunkSize uint64
+	for i := range lc.buckets {
+		ml, ms, cs := lc.buckets[i].stats()
+		mapLen += ml
+		mapSize += ms
+		chunkSize += cs
+	}
+	return fmt.Sprintf("%s map len:%d map cap:%s chunk cap:%s",
+		lc.stats.Raw(), mapLen, humanSize(int64(mapSize)), humanSize(int64(chunkSize)))
 }

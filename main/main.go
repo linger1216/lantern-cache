@@ -65,9 +65,10 @@ func usage() {
 func runCacheBenchmark(N int, pctWrites uint64) {
 	rc := uint64(0)
 	cache := lantern_cache.NewLanternCache(&lantern_cache.Config{
-		BucketCount:  512,
-		MaxCapacity:  1024 * 1024 * 100,
-		InitCapacity: 1024 * 1024 * 50,
+		ChunkAllocatorPolicy: "mmap",
+		BucketCount:          1024,
+		MaxCapacity:          1024 * 1024 * 500,
+		InitCapacity:         1024 * 1024 * 100,
 	})
 
 	for i := 0; i < N; i++ {
@@ -78,30 +79,8 @@ func runCacheBenchmark(N int, pctWrites uint64) {
 	}
 
 	count := 0
-	breakCount := 1 << 6
+	breakCount := 1 << 4
 	for {
-		//core := 4
-		//wg := sync.WaitGroup{}
-		//for i := 0; i < core; i++ {
-		//	wg.Add(1)
-		//	go func() {
-		//		mc := atomic.AddUint64(&rc, 1)
-		//		if pctWrites*mc/100 != pctWrites*(mc-1)/100 {
-		//			err := cache.Puts([]byte(strconv.Itoa(i)), blob('a', RandomNumber(1, 256)))
-		//			if err != nil {
-		//				panic(err)
-		//			}
-		//		} else {
-		//			_, err := cache.Gets([]byte(strconv.Itoa(rand.Intn(N))))
-		//			if err != nil && err != lantern_cache.ErrorNotFound && err != lantern_cache.ErrorValueExpire {
-		//				panic(err)
-		//			}
-		//		}
-		//		wg.Done()
-		//	}()
-		//}
-		//wg.Wait()
-
 		for i := 0; i < N; i++ {
 			mc := atomic.AddUint64(&rc, 1)
 			key := []byte(strconv.Itoa(rand.Intn(N)))
@@ -117,10 +96,8 @@ func runCacheBenchmark(N int, pctWrites uint64) {
 				}
 			}
 		}
-
 		count++
-		fmt.Printf("round %d %s\n", count, cache.Stats().String())
-		fmt.Printf("round %d %s\n", count, cache.Stats().Raw())
+		fmt.Printf("round %d %s\n", count, cache.String())
 		if count == breakCount {
 			break
 		}

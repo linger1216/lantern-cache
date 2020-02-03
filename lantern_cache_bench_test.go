@@ -161,7 +161,7 @@ func BenchmarkCaches(b *testing.B) {
 	//
 	//bucketCount uint32
 	//maxCapacity uint64
-	//allocPolicy string
+	allocPolicy := "heap"
 
 	benchmarks := []struct {
 		bucketCount uint32
@@ -171,41 +171,41 @@ func BenchmarkCaches(b *testing.B) {
 		valLen      uint64
 		pctWrites   uint64
 	}{
-		{1, G, "heap", 32, 256, 0},
-		{512, G, "heap", 32, 256, 0},
-		{1024, G, "heap", 32, 256, 0},
+		{1, G, allocPolicy, 32, 256, 0},
+		{512, G, allocPolicy, 32, 256, 0},
+		{1024, G, allocPolicy, 32, 256, 0},
 		//
-		{1, G, "heap", 32, 512, 0},
-		{512, G, "heap", 32, 512, 0},
-		{1024, G, "heap", 32, 512, 0},
+		{1, G, allocPolicy, 32, 512, 0},
+		{512, G, allocPolicy, 32, 512, 0},
+		{1024, G, allocPolicy, 32, 512, 0},
 		//
-		{1, G, "heap", 32, K, 0},
-		{512, G, "heap", 32, K, 0},
-		{1024, G, "heap", 32, K, 0},
+		{1, G, allocPolicy, 32, K, 0},
+		{512, G, allocPolicy, 32, K, 0},
+		{1024, G, allocPolicy, 32, K, 0},
 
-		{1, G, "heap", 32, 256, 100},
-		{512, G, "heap", 32, 256, 100},
-		{1024, G, "heap", 32, 256, 100},
+		{1, G, allocPolicy, 32, 256, 100},
+		{512, G, allocPolicy, 32, 256, 100},
+		{1024, G, allocPolicy, 32, 256, 100},
 
-		{1, G, "heap", 32, 512, 100},
-		{512, G, "heap", 32, 512, 100},
-		{1024, G, "heap", 32, 512, 100},
+		{1, G, allocPolicy, 32, 512, 100},
+		{512, G, allocPolicy, 32, 512, 100},
+		{1024, G, allocPolicy, 32, 512, 100},
 
-		{1, G, "heap", 32, K, 100},
-		{512, G, "heap", 32, K, 100},
-		{1024, G, "heap", 32, K, 100},
+		{1, G, allocPolicy, 32, K, 100},
+		{512, G, allocPolicy, 32, K, 100},
+		{1024, G, allocPolicy, 32, K, 100},
 
-		{1, G, "heap", 32, 256, 25},
-		{512, G, "heap", 32, 256, 25},
-		{1024, G, "heap", 32, 256, 25},
+		{1, G, allocPolicy, 32, 256, 25},
+		{512, G, allocPolicy, 32, 256, 25},
+		{1024, G, allocPolicy, 32, 256, 25},
 
-		{1, G, "heap", 32, 512, 25},
-		{512, G, "heap", 32, 512, 25},
-		{1024, G, "heap", 32, 512, 25},
+		{1, G, allocPolicy, 32, 512, 25},
+		{512, G, allocPolicy, 32, 512, 25},
+		{1024, G, allocPolicy, 32, 512, 25},
 
-		{1, G, "heap", 32, K, 25},
-		{512, G, "heap", 32, K, 25},
-		{1024, G, "heap", 32, K, 25},
+		{1, G, allocPolicy, 32, K, 25},
+		{512, G, allocPolicy, 32, K, 25},
+		{1024, G, allocPolicy, 32, K, 25},
 	}
 	for _, bm := range benchmarks {
 		var name string

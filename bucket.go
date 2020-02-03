@@ -11,7 +11,7 @@ type bucketConfig struct {
 	maxCapacity  uint64
 	initCapacity uint64
 	chunkAlloc   *chunkAllocator
-	stats        *Stats
+	statistics   *Stats
 }
 
 type bucket struct {
@@ -21,10 +21,8 @@ type bucket struct {
 	loop       uint32
 	chunks     [][]byte
 	chunkAlloc *chunkAllocator
-	stats      *Stats
+	statistics *Stats
 }
-
-var FixBlob []byte
 
 func newBucket(cfg *bucketConfig) *bucket {
 	assert(cfg.maxCapacity > 0, "bucket max capacity need > 0")
@@ -32,7 +30,7 @@ func newBucket(cfg *bucketConfig) *bucket {
 		cfg.initCapacity = cfg.maxCapacity / 4
 	}
 	ret := &bucket{}
-	ret.stats = cfg.stats
+	ret.statistics = cfg.statistics
 
 	needChunkCount := (cfg.maxCapacity + chunkSize - 1) / chunkSize
 	assert(needChunkCount > 0, "max bucket chunk count need > 0")
@@ -56,7 +54,6 @@ func newBucket(cfg *bucketConfig) *bucket {
 		ret.chunks[i] = chunk
 	}
 
-	FixBlob = make([]byte, 0, 4096)
 	return ret
 }
 
@@ -64,10 +61,10 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	atomic.AddUint64(&b.stats.Puts, 1)
+	atomic.AddUint64(&b.statistics.Puts, 1)
 	entrySize := uint64(EntryHeadFieldSizeOf + len(key) + len(val))
 	if len(key) == 0 || len(val) == 0 || len(key) > MaxKeySize || len(val) > MaxValueSize || entrySize > chunkSize {
-		atomic.AddUint64(&b.stats.Errors, 1)
+		atomic.AddUint64(&b.statistics.Errors, 1)
 		return ErrorInvalidEntry
 	}
 	offset := b.offset
@@ -81,8 +78,6 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 			//b.logger.Printf("chunk(%v) need loop:%d offset:%d nextOffset:%d chunkIndex:%d nextChunkIndex:%d len(b.chunks):%d", &b, b.loop, offset, nextOffset, chunkIndex, nextChunkIndex, len(b.chunks))
 			chunkIndex = 0
 			offset = 0
-			//atomic.AddInt64()
-			atomic.SwapInt64(&b.stats.BytesSize, 0)
 		} else {
 			//b.logger.Printf("bucket chunk[%d] no space to write so jump next chunk[%d] continue loop:%d", chunkIndex, nextChunkIndex, b.loop)
 			chunkIndex = nextChunkIndex
@@ -94,7 +89,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 	if b.chunks[chunkIndex] == nil {
 		chunk, err := b.chunkAlloc.getChunk()
 		if err != nil {
-			atomic.AddUint64(&b.stats.Errors, 1)
+			atomic.AddUint64(&b.statistics.Errors, 1)
 			return ErrorChunkAlloc
 		}
 		b.chunks[chunkIndex] = chunk
@@ -104,7 +99,6 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 	wrapEntry(b.chunks[chunkIndex][chunkOffset:], expire, key, val)
 	b.m[keyHash] = (uint64(b.loop) << OffsetSizeOf) | offset
 	b.offset = nextOffset
-	atomic.AddInt64(&b.stats.BytesSize, int64(entrySize))
 	//fmt.Printf("[%v] key:%s loop:%d offset:%d", &b, key, b.loop, offset)
 	return nil
 }
@@ -113,10 +107,10 @@ func (b *bucket) get(blob []byte, keyHash uint64, key []byte) ([]byte, error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	atomic.AddUint64(&b.stats.Gets, 1)
+	atomic.AddUint64(&b.statistics.Gets, 1)
 	v, ok := b.m[keyHash]
 	if !ok {
-		atomic.AddUint64(&b.stats.Misses, 1)
+		atomic.AddUint64(&b.statistics.Misses, 1)
 		return nil, ErrorNotFound
 	}
 
@@ -132,7 +126,7 @@ func (b *bucket) get(blob []byte, keyHash uint64, key []byte) ([]byte, error) {
 	if loop == b.loop && offset < b.offset || (loop+1 == b.loop && offset >= b.offset) {
 		chunkIndex := offset / chunkSize
 		if int(chunkIndex) >= len(b.chunks) {
-			atomic.AddUint64(&b.stats.Errors, 1)
+			atomic.AddUint64(&b.statistics.Errors, 1)
 			return nil, ErrorChunkIndexOutOfRange
 		}
 
@@ -144,15 +138,15 @@ func (b *bucket) get(blob []byte, keyHash uint64, key []byte) ([]byte, error) {
 
 		readKey := readKey(b.chunks[chunkIndex][chunkOffset:])
 		if !bytes.Equal(readKey, key) {
-			atomic.AddUint64(&b.stats.Collisions, 1)
+			atomic.AddUint64(&b.statistics.Collisions, 1)
 			return nil, ErrorNotFound
 		}
 		blob = append(blob, readValue(b.chunks[chunkIndex][chunkOffset:], uint16(len(readKey)))...)
-		atomic.AddUint64(&b.stats.Hits, 1)
+		atomic.AddUint64(&b.statistics.Hits, 1)
 		return blob, nil
 	}
 
-	atomic.AddUint64(&b.stats.Misses, 1)
+	atomic.AddUint64(&b.statistics.Misses, 1)
 	return nil, ErrorNotFound
 }
 
@@ -178,4 +172,20 @@ func (b *bucket) reset() {
 	}
 	b.offset = 0
 	b.loop = 0
+}
+
+// map len
+// map cap
+// chunk size
+func (b *bucket) stats() (uint64, uint64, uint64) {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+
+	size := uint64(0)
+	for i := range b.chunks {
+		if b.chunks[i] != nil {
+			size += uint64(len(b.chunks[i]))
+		}
+	}
+	return uint64(len(b.m)), uint64(len(b.m) * 16), size
 }

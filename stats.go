@@ -8,25 +8,22 @@ type Stats struct {
 	Errors     uint64
 	Hits       uint64
 	Misses     uint64
-	BytesSize  int64
 	Collisions uint64
 }
 
 func (s *Stats) String() string {
-	return fmt.Sprintf("hit:%f err:%f collisions:%f bytes:%s",
+	return fmt.Sprintf("hit:%f err:%f collisions:%f",
 		float32(s.Hits)/float32(s.Gets),
 		float32(s.Errors)/float32(s.Gets+s.Puts),
-		float32(s.Collisions)/float32(s.Gets+s.Puts),
-		humanSize(int64(s.BytesSize)))
+		float32(s.Collisions)/float32(s.Gets+s.Puts))
 }
 
 func (s *Stats) Raw() string {
-	return fmt.Sprintf("get:%d put:%d err:%d hit:%d miss:%d bytes:%s collisions:%d",
+	return fmt.Sprintf("get:%d put:%d err:%d hit:%d miss:%d collisions:%d",
 		s.Gets,
 		s.Puts,
 		s.Errors,
 		s.Hits,
 		s.Misses,
-		humanSize(int64(s.BytesSize)),
 		s.Collisions)
 }
