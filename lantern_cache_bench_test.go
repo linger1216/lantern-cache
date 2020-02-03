@@ -95,7 +95,7 @@ type LTCache struct {
 }
 
 func (b *LTCache) Get(key []byte) ([]byte, error) {
-	//return b.c.Get(key)
+	//return b.c.Gets(key)
 	return b.c.GetWithBuffer(b.buf, key)
 }
 

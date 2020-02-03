@@ -64,7 +64,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	atomic.AddUint64(&b.stats.PutCalls, 1)
+	atomic.AddUint64(&b.stats.Puts, 1)
 	entrySize := uint64(EntryHeadFieldSizeOf + len(key) + len(val))
 	if len(key) == 0 || len(val) == 0 || len(key) > MaxKeySize || len(val) > MaxValueSize || entrySize > chunkSize {
 		atomic.AddUint64(&b.stats.Errors, 1)
@@ -81,6 +81,8 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 			//b.logger.Printf("chunk(%v) need loop:%d offset:%d nextOffset:%d chunkIndex:%d nextChunkIndex:%d len(b.chunks):%d", &b, b.loop, offset, nextOffset, chunkIndex, nextChunkIndex, len(b.chunks))
 			chunkIndex = 0
 			offset = 0
+			//atomic.AddInt64()
+			atomic.SwapInt64(&b.stats.BytesSize, 0)
 		} else {
 			//b.logger.Printf("bucket chunk[%d] no space to write so jump next chunk[%d] continue loop:%d", chunkIndex, nextChunkIndex, b.loop)
 			chunkIndex = nextChunkIndex
@@ -102,8 +104,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 	wrapEntry(b.chunks[chunkIndex][chunkOffset:], expire, key, val)
 	b.m[keyHash] = (uint64(b.loop) << OffsetSizeOf) | offset
 	b.offset = nextOffset
-	atomic.AddUint64(&b.stats.BytesSize, entrySize)
-
+	atomic.AddInt64(&b.stats.BytesSize, int64(entrySize))
 	//fmt.Printf("[%v] key:%s loop:%d offset:%d", &b, key, b.loop, offset)
 	return nil
 }
@@ -112,7 +113,7 @@ func (b *bucket) get(blob []byte, keyHash uint64, key []byte) ([]byte, error) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
-	atomic.AddUint64(&b.stats.GetCalls, 1)
+	atomic.AddUint64(&b.stats.Gets, 1)
 	v, ok := b.m[keyHash]
 	if !ok {
 		atomic.AddUint64(&b.stats.Misses, 1)

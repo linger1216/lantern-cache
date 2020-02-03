@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"strconv"
 	"sync"
+	"sync/atomic"
 	"time"
 )
 
@@ -23,6 +24,11 @@ func RandomNumber(min, max int) int {
 }
 
 func main() {
+	// usage()
+	runCacheBenchmark(1<<20, 25)
+}
+
+func usage() {
 	N := 200000
 	cache := lantern_cache.NewLanternCache(&lantern_cache.Config{
 		BucketCount:  512,
@@ -54,4 +60,69 @@ func main() {
 	wg.Wait()
 	fmt.Printf("%s\n", cache.Stats().String())
 	fmt.Printf("%s\n", cache.Stats().Raw())
+}
+
+func runCacheBenchmark(N int, pctWrites uint64) {
+	rc := uint64(0)
+	cache := lantern_cache.NewLanternCache(&lantern_cache.Config{
+		BucketCount:  512,
+		MaxCapacity:  1024 * 1024 * 100,
+		InitCapacity: 1024 * 1024 * 50,
+	})
+
+	for i := 0; i < N; i++ {
+		err := cache.Put([]byte(strconv.Itoa(i)), blob('a', RandomNumber(1, 256)))
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	count := 0
+	breakCount := 1 << 6
+	for {
+		//core := 4
+		//wg := sync.WaitGroup{}
+		//for i := 0; i < core; i++ {
+		//	wg.Add(1)
+		//	go func() {
+		//		mc := atomic.AddUint64(&rc, 1)
+		//		if pctWrites*mc/100 != pctWrites*(mc-1)/100 {
+		//			err := cache.Puts([]byte(strconv.Itoa(i)), blob('a', RandomNumber(1, 256)))
+		//			if err != nil {
+		//				panic(err)
+		//			}
+		//		} else {
+		//			_, err := cache.Gets([]byte(strconv.Itoa(rand.Intn(N))))
+		//			if err != nil && err != lantern_cache.ErrorNotFound && err != lantern_cache.ErrorValueExpire {
+		//				panic(err)
+		//			}
+		//		}
+		//		wg.Done()
+		//	}()
+		//}
+		//wg.Wait()
+
+		for i := 0; i < N; i++ {
+			mc := atomic.AddUint64(&rc, 1)
+			key := []byte(strconv.Itoa(rand.Intn(N)))
+			if pctWrites*mc/100 != pctWrites*(mc-1)/100 {
+				err := cache.Put(key, blob('a', RandomNumber(1, 256)))
+				if err != nil {
+					panic(err)
+				}
+			} else {
+				_, err := cache.Get(key)
+				if err != nil && err != lantern_cache.ErrorNotFound && err != lantern_cache.ErrorValueExpire {
+					panic(err)
+				}
+			}
+		}
+
+		count++
+		fmt.Printf("round %d %s\n", count, cache.Stats().String())
+		fmt.Printf("round %d %s\n", count, cache.Stats().Raw())
+		if count == breakCount {
+			break
+		}
+	}
 }

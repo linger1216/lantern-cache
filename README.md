@@ -1,9 +1,6 @@
 # lantern-cache
 
-idea from fastcache
-
-i'll write more desc, wait wait
-
+- max v len 64KB
 - thread safe
 
 ### usage
