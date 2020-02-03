@@ -75,7 +75,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 	if nextChunkIndex > chunkIndex {
 		if int(nextChunkIndex) >= len(b.chunks) {
 			b.loop++
-			//b.logger.Printf("chunk(%v) need loop:%d offset:%d nextOffset:%d chunkIndex:%d nextChunkIndex:%d len(b.chunks):%d", &b, b.loop, offset, nextOffset, chunkIndex, nextChunkIndex, len(b.chunks))
+			//fmt.Printf("chunk(%v) need loop:%d offset:%d nextOffset:%d chunkIndex:%d nextChunkIndex:%d len(b.chunks):%d\n", &b, b.loop, offset, nextOffset, chunkIndex, nextChunkIndex, len(b.chunks))
 			chunkIndex = 0
 			offset = 0
 		} else {
@@ -177,7 +177,8 @@ func (b *bucket) reset() {
 // map len
 // map cap
 // chunk size
-func (b *bucket) stats() (uint64, uint64, uint64) {
+// 理论上chunk最多容量
+func (b *bucket) stats() (uint64, uint64, uint64, uint64) {
 	b.mutex.RLock()
 	defer b.mutex.RUnlock()
 
@@ -187,5 +188,5 @@ func (b *bucket) stats() (uint64, uint64, uint64) {
 			size += uint64(len(b.chunks[i]))
 		}
 	}
-	return uint64(len(b.m)), uint64(len(b.m) * 16), size
+	return uint64(len(b.m)), uint64(len(b.m) * 16), size, uint64(len(b.chunks)) * chunkSize
 }

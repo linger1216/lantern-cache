@@ -8,25 +8,35 @@ import (
 	"unsafe"
 )
 
-func RandomString(length int) string {
-	rand.Seed(time.Now().UnixNano())
-	rs := make([]string, length)
+const charset = "abcdefghijklmnopqrstuvwxyz" + "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789"
 
-	for start := 0; start < length; start++ {
-		t := rand.Intn(2)
-		if t == 0 {
-			// A-Z
-			rs = append(rs, string(rand.Intn(26)+65))
-		} else {
-			// a-z
-			rs = append(rs, string(rand.Intn(26)+97))
-		}
+var seededRand *rand.Rand = rand.New(rand.NewSource(time.Now().UnixNano()))
+
+func stringWithCharset(length int, charset string) string {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
 	}
-	return strings.Join(rs, "")
+	return string(b)
 }
 
-func RandomNumber(min, max int) int {
-	rand.Seed(time.Now().UnixNano())
+func randomString(length int) string {
+	return stringWithCharset(length, charset)
+}
+
+func byteWithCharset(length int, charset string) []byte {
+	b := make([]byte, length)
+	for i := range b {
+		b[i] = charset[seededRand.Intn(len(charset))]
+	}
+	return b
+}
+
+func randomByte(length int) []byte {
+	return byteWithCharset(length, charset)
+}
+
+func randomNumber(min, max int) int {
 	return rand.Intn(max) + min
 }
 
