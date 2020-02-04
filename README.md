@@ -128,6 +128,3 @@ PASS
 
 
 ### memory
-
-
-Using Heap strategy memory will double, but using the mmap strategy's memory will only grow by a fifth.

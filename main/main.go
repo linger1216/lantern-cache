@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	lantern_cache "github.com/linger1216/lantern-cache"
+	"github.com/pkg/profile"
 	"math/rand"
 	"strconv"
 	"sync"
@@ -26,7 +27,7 @@ func main() {
 	rand.Seed(time.Now().UnixNano())
 
 	// usage()
-	runCacheBenchmark(1<<24, 0)
+	runCacheBenchmark(1<<24, 100)
 }
 
 func usage() {
@@ -94,18 +95,19 @@ func randomByte(length int) []byte {
 }
 
 func runCacheBenchmark(N int, pctWrites uint64) {
+
+	defer profile.Start(profile.MemProfile).Stop()
+
 	rc := uint64(0)
 	cache := lantern_cache.NewLanternCache(&lantern_cache.Config{
-		ChunkAllocatorPolicy: "heap",
+		ChunkAllocatorPolicy: "mmap",
 		BucketCount:          512,
 		MaxCapacity:          1024 * 1024 * 500,
 		InitCapacity:         1024 * 1024 * 100,
 	})
 
-	//fillBuf := blob('a', 512)
-
 	for i := 0; i < N; i++ {
-		kv := []byte{byte(rand.Intn(N))}
+		kv := []byte(strconv.Itoa(i))
 		err := cache.Put(kv, kv)
 		if err != nil {
 			panic(err)
@@ -116,30 +118,27 @@ func runCacheBenchmark(N int, pctWrites uint64) {
 	fmt.Printf("init %s\n", cache.String())
 	time.Sleep(time.Second * 5)
 
-	//buf := make([]byte, 0, 1024)
-
-	count := 0
-	breakCount := 1 << 8
+	i := 0
+	roundCount := 1 << 3
 	for {
 		for i := 0; i < N; i++ {
 			mc := atomic.AddUint64(&rc, 1)
-			key := []byte{byte(rand.Intn(N))}
+			key := []byte(strconv.Itoa(rand.Intn(N)))
 			if pctWrites*mc/100 != pctWrites*(mc-1)/100 {
-				err := cache.Put(key, randomByte(RandomNumber(1, N)))
+				err := cache.Put(key, randomByte(RandomNumber(1, 32)))
 				if err != nil {
 					panic(err)
 				}
 			} else {
 				_, err := cache.Get(key)
-				//_, err := cache.GetWithBuffer(buf, key)
 				if err != nil && err != lantern_cache.ErrorNotFound && err != lantern_cache.ErrorValueExpire {
 					panic(err)
 				}
 			}
 		}
-		count++
-		fmt.Printf("round %d %s\n", count, cache.String())
-		if count == breakCount {
+		i++
+		fmt.Printf("round %d %s\n", i, cache.String())
+		if i == roundCount {
 			break
 		}
 	}
