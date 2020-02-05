@@ -58,10 +58,14 @@ func newBucket(cfg *bucketConfig) *bucket {
 }
 
 func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
+	puts := atomic.AddUint64(&b.statistics.Puts, 1)
+	if puts%(CleanCount) == 0 {
+		b.clean()
+	}
+
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
 
-	atomic.AddUint64(&b.statistics.Puts, 1)
 	entrySize := uint64(EntryHeadFieldSizeOf + len(key) + len(val))
 	if len(key) == 0 || len(val) == 0 || len(key) > MaxKeySize || len(val) > MaxValueSize || entrySize > chunkSize {
 		atomic.AddUint64(&b.statistics.Errors, 1)
@@ -97,6 +101,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 
 	chunkOffset := offset & (chunkSize - 1) // or offset % chunkSize
 	wrapEntry(b.chunks[chunkIndex][chunkOffset:], expire, key, val)
+
 	b.m[keyHash] = (uint64(b.loop) << OffsetSizeOf) | offset
 	b.offset = nextOffset
 	//fmt.Printf("[%v] key:%s loop:%d offset:%d", &b, key, b.loop, offset)
@@ -148,6 +153,22 @@ func (b *bucket) get(blob []byte, keyHash uint64, key []byte) ([]byte, error) {
 
 	atomic.AddUint64(&b.statistics.Misses, 1)
 	return nil, ErrorNotFound
+}
+
+func (b *bucket) clean() {
+	count := 0
+	b.mutex.Lock()
+	for k, v := range b.m {
+		loop := uint32(v >> OffsetSizeOf)
+		offset := v & 0x000000ffffffffff
+		if loop == b.loop && offset < b.offset || (loop+1 == b.loop && offset >= b.offset) {
+			continue
+		}
+		delete(b.m, k)
+		count++
+	}
+	b.mutex.Unlock()
+	//fmt.Printf("clean %d\n", count)
 }
 
 func (b *bucket) del(keyHash uint64) {

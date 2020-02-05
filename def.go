@@ -1,6 +1,7 @@
 package lantern_cache
 
 const (
+	CleanCount                = 1 << 24
 	chunkSize                 = 64 * 1024
 	chunksPerAlloc            = 1024
 	MaxKeySize                = 1 << 16
