@@ -4,6 +4,7 @@ import (
 	"fmt"
 	lantern_cache "github.com/linger1216/lantern-cache"
 	"github.com/pkg/profile"
+	metrics "github.com/tevjef/go-runtime-metrics"
 	"math/rand"
 	"runtime"
 	"strconv"
@@ -25,6 +26,11 @@ func RandomNumber(min, max int) int {
 }
 
 func main() {
+	metrics.DefaultConfig.CollectionInterval = time.Second
+	if err := metrics.RunCollector(metrics.DefaultConfig); err != nil {
+		// handle error
+	}
+
 	rand.Seed(time.Now().UnixNano())
 	// usage()
 	runCacheBenchmark(1<<24, 100)
