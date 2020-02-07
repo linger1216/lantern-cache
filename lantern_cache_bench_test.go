@@ -12,13 +12,6 @@ import (
 )
 
 const (
-	// based on 21million dataset, we observed a maximum key length of 77,
-	// with minimum length being 6 and average length being 25. We also
-	// observed that 99% of keys had length <64 bytes.
-	maxKeyLength = 128
-	// workloadSize is the size of array storing sequence of keys that we
-	// have in our workload. In the benchmark, we iterate over this array b.N
-	// number of times in circular fashion starting at a random position.
 	workloadSize = 2 << 20
 )
 
@@ -39,10 +32,24 @@ func blob(char byte, len int) []byte {
 	return b
 }
 
-func bytesList(keyLen int) [][]byte {
-	keys := make([][]byte, workloadSize)
-	for i := 0; i < workloadSize; i++ {
-		keys[i] = blob(byte(i)+'a', keyLen)
+func keysList(count, l int) [][]byte {
+	keys := make([][]byte, count)
+	for i := 0; i < count; i++ {
+		b := make([]byte, 0, l)
+		s := l - len(strconv.Itoa(i))
+		b = append(b, []byte(strconv.Itoa(i))...)
+		for i := 0; i < s; i++ {
+			b = append(b, 'a')
+		}
+		keys[i] = b
+	}
+	return keys
+}
+
+func valsList(count, l int) [][]byte {
+	keys := make([][]byte, count)
+	for i := 0; i < count; i++ {
+		keys[i] = blob('a', l)
 	}
 	return keys
 }
@@ -158,15 +165,12 @@ func runCacheBenchmark(b *testing.B, cache Cache, keys [][]byte, vals [][]byte, 
 }
 
 func BenchmarkCaches(b *testing.B) {
-
 	G := uint64(1024 * 1024 * 1024)
-	//M := uint64(1024 * 1024 * 1024)
+	M := uint64(1024 * 1024 * 1024)
+	_ = M
 	K := uint64(1024)
 	_ = K
-	//
-	//bucketCount uint32
-	//maxCapacity uint64
-	allocPolicy := "heap"
+	allocPolicy := "mmap"
 
 	benchmarks := []struct {
 		bucketCount uint32
@@ -223,19 +227,10 @@ func BenchmarkCaches(b *testing.B) {
 		}
 		name = fmt.Sprintf("%s bucket:%d capacity:%s alloc:%s kenLen:%d valLen:%d", name, bm.bucketCount, humanSize(int64(bm.maxCapacity)), bm.allocPolicy, bm.keyLen, bm.valLen)
 		cache := newLTCache(bm.bucketCount, bm.maxCapacity, bm.allocPolicy)
-		keys := bytesList(int(bm.keyLen))
-		vals := bytesList(int(bm.valLen))
+		keys := keysList(workloadSize, int(bm.keyLen))
+		vals := valsList(workloadSize, int(bm.valLen))
 		b.Run(name, func(b *testing.B) {
 			runCacheBenchmark(b, cache, keys, vals, bm.pctWrites)
 		})
 	}
 }
-
-/*
-	{"SyncMapRead32-32", newSyncMap(), bytesList(32), bytesList(32), 0},
-	{"SyncMapRead64-64", newSyncMap(), bytesList(64), bytesList(64), 0},
-	{"SyncMapRead64-128", newSyncMap(), bytesList(64), bytesList(128), 0},
-	{"SyncMapRead64-256", newSyncMap(), bytesList(64), bytesList(256), 0},
-	{"SyncMapRead64-512", newSyncMap(), bytesList(64), bytesList(512), 0},
-	{"SyncMapRead64-1024", newSyncMap(), bytesList(64), bytesList(1024), 0},
-*/

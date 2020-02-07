@@ -127,13 +127,28 @@ func (lc *LanternCache) Stats() *Stats {
 
 func (lc *LanternCache) String() string {
 	var mapLen, mapSize, chunkSize, maxChunkSize uint64
+	var bucketMinMapLen, bucketMaxMapLen uint64
+
 	for i := range lc.buckets {
 		ml, ms, cs, mcs := lc.buckets[i].stats()
+		if i == 0 {
+			bucketMinMapLen = ml
+			bucketMaxMapLen = ml
+		}
+
+		if ml < bucketMinMapLen {
+			bucketMinMapLen = ml
+		}
+
+		if ml > bucketMaxMapLen {
+			bucketMaxMapLen = ml
+		}
+
 		mapLen += ml
 		mapSize += ms
 		chunkSize += cs
 		maxChunkSize += mcs
 	}
-	return fmt.Sprintf("%s mapLen:%d mapCap:%s chunkCap:%s maxChunkCap:%s",
-		lc.stats.Raw(), mapLen, humanSize(int64(mapSize)), humanSize(int64(chunkSize)), humanSize(int64(maxChunkSize)))
+	return fmt.Sprintf("%s mapLen:%d mapCap:%s bucketMinMapLen:%d bucketMaxMapLen:%d bucketAvgMapLen:%d chunkCap:%s maxChunkCap:%s",
+		lc.stats.Raw(), mapLen, humanSize(int64(mapSize)), bucketMinMapLen, bucketMaxMapLen, mapLen/uint64(len(lc.buckets)), humanSize(int64(chunkSize)), humanSize(int64(maxChunkSize)))
 }

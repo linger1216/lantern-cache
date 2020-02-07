@@ -44,6 +44,7 @@ func newBucket(cfg *bucketConfig) *bucket {
 	ret.chunkAlloc = cfg.chunkAlloc
 	ret.offset = 0
 	ret.loop = 0
+
 	ret.m = make(map[uint64]uint64)
 
 	for i := uint64(0); i < initChunkCount; i++ {
@@ -53,7 +54,6 @@ func newBucket(cfg *bucketConfig) *bucket {
 		}
 		ret.chunks[i] = chunk
 	}
-
 	return ret
 }
 
@@ -99,7 +99,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 		b.chunks[chunkIndex] = chunk
 	}
 
-	chunkOffset := offset & (chunkSize - 1) // or offset % chunkSize
+	chunkOffset := offset & (chunkSize - 1)
 	wrapEntry(b.chunks[chunkIndex][chunkOffset:], expire, key, val)
 
 	b.m[keyHash] = (uint64(b.loop) << OffsetSizeOf) | offset
@@ -168,12 +168,11 @@ func (b *bucket) clean() {
 		count++
 	}
 	b.mutex.Unlock()
-	//fmt.Printf("clean %d\n", count)
 }
 
 func (b *bucket) del(keyHash uint64) {
-	b.mutex.RLock()
-	defer b.mutex.RUnlock()
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
 	delete(b.m, keyHash)
 }
 
@@ -187,9 +186,8 @@ func (b *bucket) reset() {
 		chunks[i] = nil
 	}
 
-	bm := b.m
-	for k := range bm {
-		delete(bm, k)
+	for k := range b.m {
+		delete(b.m, k)
 	}
 	b.offset = 0
 	b.loop = 0

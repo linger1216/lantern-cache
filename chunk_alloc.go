@@ -44,14 +44,18 @@ func NewChunkAllocator(policy string) *chunkAllocator {
 	default:
 		panic(fmt.Errorf("can't support factory %s", policy))
 	}
+	ret.freeChunks = make([]*[chunkSize]byte, 0)
 	return ret
 }
+
+var cc int
 
 func (c *chunkAllocator) getChunk() ([]byte, error) {
 	c.freeChunksLock.Lock()
 	if len(c.freeChunks) == 0 {
 		allocSize := chunkSize * chunksPerAlloc
 		data, err := c.factory.getChunk(uint32(allocSize))
+		cc++
 		if err != nil {
 			panic(fmt.Errorf("cannot allocate %d bytes via mmap: %s", chunkSize*chunksPerAlloc, err))
 		}
@@ -67,7 +71,6 @@ func (c *chunkAllocator) getChunk() ([]byte, error) {
 	ret := p[:]
 
 	//ret = ret[:0]  // memset
-
 	c.freeChunks[n] = nil
 	c.freeChunks = c.freeChunks[:n]
 	c.freeChunksLock.Unlock()

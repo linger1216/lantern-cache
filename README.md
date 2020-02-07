@@ -5,52 +5,22 @@
 
 ### usage
 ```
-
-func blob(char byte, len int) []byte {
-	b := make([]byte, len)
-	for index := range b {
-		b[index] = char
-	}
-	return b
-}
-
-func RandomNumber(min, max int) int {
-	rand.Seed(time.Now().UnixNano())
-	return rand.Intn(max) + min
-}
-
 func main() {
-	N := 200000
 	cache := lantern_cache.NewLanternCache(&lantern_cache.Config{
 		BucketCount:  512,
 		MaxCapacity:  1024 * 1024 * 40,
 		InitCapacity: 1024 * 1024 * 5,
 	})
 
-	for i := 0; i < N; i++ {
-		err := cache.Put([]byte(strconv.Itoa(i)), blob('a', RandomNumber(1, 512)))
-		if err != nil {
-			panic(err)
-		}
+	err := cache.Put([]byte("hello"), []byte("china"))
+	if err != nil {
+		panic(err)
 	}
-
-	core := 8
-	wg := sync.WaitGroup{}
-	for i := 0; i < core; i++ {
-		wg.Add(1)
-		go func() {
-			for i := 0; i < N; i++ {
-				_, err := cache.Get([]byte(strconv.Itoa(rand.Intn(N))))
-				if err != nil && err != lantern_cache.ErrorNotFound && err != lantern_cache.ErrorValueExpire {
-					panic(err)
-				}
-			}
-			wg.Done()
-		}()
+	_, err = cache.Get([]byte("world"))
+	if err != nil && err != lantern_cache.ErrorNotFound && err != lantern_cache.ErrorValueExpire {
+		panic(err)
 	}
-	wg.Wait()
-	fmt.Printf("%s\n", cache.Stats().String())
-	fmt.Printf("%s\n", cache.Stats().Raw())
+	cache.Reset()
 }
 ```
 
@@ -58,73 +28,75 @@ func main() {
 ### benchmark
 - alloc from heap
 ```
-BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:256-4           12393765               108 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:256-4         16558442               128 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:256-4        11881024               117 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:512-4           10948254               125 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:512-4         12483867               162 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:512-4        13507720               158 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4           8720259               212 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4         9942254               206 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4        9516438               128 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:256-4           4641710               243 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:256-4         6730789               168 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:256-4       11353910               116 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:512-4           4146306               284 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:512-4         9277275               180 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:512-4       10435339               162 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4          3529626               399 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4        6396568               217 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4       8316360               178 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:256-4             3633373               386 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:256-4           5452452               250 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:256-4          5973034               200 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:512-4             2751213               434 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:512-4           5763490               250 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:512-4          6115072               258 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4            2593638               395 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4          4023894               292 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4         4678814               246 ns/op               0 B/op          0 allocs/op
-PASS
+goos: darwin
+goarch: amd64
+pkg: github.com/linger1216/lantern-cache
+BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:256-4         	 7151116	       245 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:256-4       	 7108485	       238 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:256-4      	 6221467	       233 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:512-4         	 5946895	       259 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:512-4       	 6670867	       368 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:512-4      	 5518003	       332 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4        	 8055612	       189 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4      	 9266700	       157 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4     	 5758790	       286 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:256-4        	 2746644	       425 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:256-4      	 7245910	       211 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:256-4     	 8116939	       237 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:512-4        	 2675181	       576 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:512-4      	 7471868	       274 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:512-4     	 8697382	       259 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4       	 2580746	       863 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4     	 6427698	       314 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4    	 5146905	       351 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:256-4          	 2390143	       580 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:256-4        	 10110430	       176 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:256-4       	 8525252	       185 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:512-4          	 2541436	       550 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:512-4        	 9533241	       246 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:512-4       	 9117368	       275 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4         	 2843509	       657 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4       	10732830	       212 ns/op	       0 B/op	       0 allocs/op
+BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:heap_kenLen:32_valLen:1024-4      	 8898570	       249 ns/op	       0 B/op	       0 allocs/op
 
 ```
 
 
 - alloc from mmap
 ```
-goos: darwin
-goarch: amd64
 pkg: github.com/linger1216/lantern-cache
-BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4           10848022               144 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4         15294328                82.1 ns/op             0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4        12562880               127 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4            8294994               163 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4         11843563               135 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4        12868899               110 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4           5119826               219 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4         8657952               197 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4        9322738               155 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4           4063599               252 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4         8473459               152 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4       10571989               119 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4           3926442               336 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4         7367847               165 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4       10426177               132 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4          3467011               396 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4        7176171               196 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4       7783929               223 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4             3357818               358 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4           6996694               230 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4          5949139               193 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4             3018706               357 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4           5408210               244 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4          5737129               249 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4            2831487               389 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4          4077646               258 ns/op               0 B/op          0 allocs/op
-BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4         5917294               253 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4           10713336               191 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4          7468760               203 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4         9556656               215 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4           10451970               218 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4          7877008               291 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4         6027376               312 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4           9160233               179 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4         6528870               432 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[read]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4        6574810               330 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4           2767180               400 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4         8716328               153 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4        9171146               136 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4           2682656               484 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4         7170303               182 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4        7321443               170 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4          2015647               980 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4        6533864               362 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[write]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4       5094814               353 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4             2611654               485 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4           6365592               220 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:256-4          8879248               199 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4             3433490               631 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4           4773789               215 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:512-4          5198325               231 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:1_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4            2575622               660 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:512_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4          6118138               206 ns/op               0 B/op          0 allocs/op
+BenchmarkCaches/[mix]_bucket:1024_capacity:1G_alloc:mmap_kenLen:32_valLen:1024-4         4726443               269 ns/op               0 B/op          0 allocs/op
 PASS
-
 ```
 
 
-### memory
+### environment
+- MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports)
+- 2.3 GHz Intel Core i5
+- 8 GB 2133 MHz LPDDR
