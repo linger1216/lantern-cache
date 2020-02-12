@@ -1,4 +1,4 @@
-package lantern_cache
+package lantern
 
 const (
 	CleanCount                = 1 << 24

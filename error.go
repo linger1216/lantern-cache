@@ -1,31 +1,12 @@
-package lantern_cache
+package lantern
 
 import "fmt"
 
 var (
-	ErrorInValidStackType = fmt.Errorf("invalid slot stack type should be uint32")
+	ErrorCopy                   = fmt.Errorf("invalid copy")
+	ErrorBloomFilterInvalidPara = fmt.Errorf("ErrorBloomFilterInvalidPara")
+	ErrorBloomFilterInvalidSize = fmt.Errorf("ErrorBloomFilterInvalidSize")
 
-	ErrorInvalidEntry = fmt.Errorf("invalid entry")
-
-	// common
-	ErrorCopy = fmt.Errorf("invalid copy")
-
-	// chunk
-	ErrorChunkAlloc = fmt.Errorf("alloc chunk error")
-
-	// bucket
-	ErrorEntryTooBig          = fmt.Errorf("value too big")
-	ErrorChunkIndexOutOfRange = fmt.Errorf("chunk index out of range")
-
-	// cache
-	ErrorNotFound    = fmt.Errorf("not found")
-	ErrorValueExpire = fmt.Errorf("value expire")
-
-	// slot
-	ErrorSlotDelete         = fmt.Errorf("")
-	ErrorSlotCapacityExceed = fmt.Errorf("capacity full")
-	ErrorSlotStackEmpty     = fmt.Errorf("")
-
-	// ring
-	ErrorRingDelete = fmt.Errorf("")
+	ErrorBitsetInvalid = fmt.Errorf("ErrorBitsetInvalid")
+	ErrorNotPowerOfTwo = fmt.Errorf("ErrorNotPowerOfTwo")
 )

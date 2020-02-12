@@ -1,4 +1,4 @@
-package lantern_cache
+package lantern
 
 func assert(condition bool, msg string, v ...interface{}) {
 	//if !condition {

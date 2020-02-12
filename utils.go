@@ -1,4 +1,4 @@
-package lantern_cache
+package lantern
 
 import (
 	"math/rand"
@@ -40,8 +40,20 @@ func randomNumber(min, max int) int {
 	return rand.Intn(max) + min
 }
 
-func isPowerOfTwo(number uint32) bool {
+func isPowerOfTwo(number uint64) bool {
 	return (number & (number - 1)) == 0
+}
+
+func next2Power(x uint64) uint64 {
+	x--
+	x |= x >> 1
+	x |= x >> 2
+	x |= x >> 4
+	x |= x >> 8
+	x |= x >> 16
+	x |= x >> 32
+	x++
+	return x
 }
 
 func str2bytes(s string) []byte {
