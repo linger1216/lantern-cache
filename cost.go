@@ -1,7 +1,7 @@
 package lantern
 
 const (
-	randomPairCount = 5
+	SampleCount = 5
 )
 
 // 成本计算器
@@ -31,17 +31,17 @@ func (c *coster) clear() {
 	c.used = 0
 }
 
-func (c *coster) randomPair() [randomPairCount]costerPair {
-	ret := [randomPairCount]costerPair{}
-	i := 0
-	for k := range c.m {
-		ret[i] = costerPair{k, c.m[k]}
-		i++
-		if i >= randomPairCount {
-			break
+func (c *coster) fillSample(in []costerPair) []costerPair {
+	if len(in) >= SampleCount {
+		return in
+	}
+	for hash, cost := range c.m {
+		in = append(in, costerPair{hash, cost})
+		if len(in) >= SampleCount {
+			return in
 		}
 	}
-	return ret
+	return in
 }
 
 func (c *coster) remain(cost int64) int64 {
@@ -62,8 +62,7 @@ func (c *coster) updateIfHas(hashed uint64, cost int64) bool {
 	if !ok {
 		return false
 	}
-	c.add(hashed, cost-prevCost)
-	return true
+	return c.add(hashed, cost-prevCost)
 }
 
 func (c *coster) del(hashed uint64) {

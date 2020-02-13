@@ -9,4 +9,6 @@ var (
 
 	ErrorBitsetInvalid = fmt.Errorf("ErrorBitsetInvalid")
 	ErrorNotPowerOfTwo = fmt.Errorf("ErrorNotPowerOfTwo")
+
+	ErrorCostTooLarge = fmt.Errorf("ErrorCostTooLarge")
 )

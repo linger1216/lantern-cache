@@ -1,8 +1,9 @@
 package lantern
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestCoster(t *testing.T) {
@@ -19,7 +20,9 @@ func TestCoster(t *testing.T) {
 	require.Equal(t, c.remain(0), int64(6))
 	c.del(2)
 	require.Equal(t, c.remain(0), int64(7))
-	sample := c.randomPair()
+
+	sample := make([]costerPair, 0, SampleCount)
+	sample = c.fillSample(sample)
 	for i := range sample {
 		if i <= 1 {
 			require.Greater(t, sample[i].hash, uint64(0))

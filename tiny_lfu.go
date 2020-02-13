@@ -3,15 +3,15 @@ package lantern
 // 将一个key, hash后传入LFU, 进行频率统计
 // LFU要记录所有key, 但全部存放太大, 所以用bloom filter来代替
 // 光记录key还不够, 还要记录频率, 这里用count-min来代替
-type TinyLfu struct {
+type tinyLfu struct {
 	countMinSketch *countMinSketch
 	bloomFilter    *bloomFilter
 	total          uint64
 	currentCount   uint64
 }
 
-func newTinyLFU(n uint64) *TinyLfu {
-	return &TinyLfu{
+func newTinyLFU(n uint64) *tinyLfu {
+	return &tinyLfu{
 		countMinSketch: newCountMinSketch(n),
 		bloomFilter:    newBloomFilter(float64(n), 0.01),
 		total:          n,
@@ -19,7 +19,7 @@ func newTinyLFU(n uint64) *TinyLfu {
 	}
 }
 
-func (t *TinyLfu) Put(keyHash uint64) {
+func (t *tinyLfu) Put(keyHash uint64) {
 	if add := t.bloomFilter.addIfNotHas(keyHash); add {
 		t.countMinSketch.increment(keyHash)
 		// 这里把逻辑放在这, 因为判断是否has本来就是有误差, 如果要精确的逻辑
@@ -38,7 +38,7 @@ func (t *TinyLfu) Put(keyHash uint64) {
 }
 
 //
-func (t *TinyLfu) estimate(keyHash uint64) uint64 {
+func (t *tinyLfu) estimate(keyHash uint64) uint64 {
 	hit := t.countMinSketch.estimate(keyHash)
 	if t.bloomFilter.has(keyHash) {
 		hit++
@@ -46,7 +46,7 @@ func (t *TinyLfu) estimate(keyHash uint64) uint64 {
 	return uint64(hit)
 }
 
-func (t *TinyLfu) reset() {
+func (t *tinyLfu) reset() {
 	t.countMinSketch.reset()
 	t.bloomFilter.reset()
 	t.currentCount = 0
