@@ -3,6 +3,7 @@ module github.com/linger1216/lantern-cache
 go 1.13
 
 require (
+	github.com/cespare/xxhash v1.1.0
 	github.com/davecgh/go-spew v1.1.1
 	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/influxdata/influxdb v1.7.9 // indirect

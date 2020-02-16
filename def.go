@@ -1,8 +1,8 @@
 package lantern
 
 const (
-	CleanCount                = 1 << 24
-	chunkSize                 = 64 * 1024
+	CleanCount = 1 << 24
+
 	chunksPerAlloc            = 1024
 	MaxKeySize                = 1 << 16
 	MaxValueSize              = 1 << 16 // 64k

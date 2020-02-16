@@ -11,4 +11,8 @@ var (
 	ErrorNotPowerOfTwo = fmt.Errorf("ErrorNotPowerOfTwo")
 
 	ErrorCostTooLarge = fmt.Errorf("ErrorCostTooLarge")
+
+	// node
+	ErrorNodeFull    = fmt.Errorf("ErrorNodeFull")
+	ErrorNodeReadEof = fmt.Errorf("ErrorNodeReadEof index")
 )

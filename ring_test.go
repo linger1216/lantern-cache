@@ -5,14 +5,14 @@ import "testing"
 type wrongConsumer struct {
 }
 
-func (w *wrongConsumer) Push(datas ...uint64) bool {
+func (w *wrongConsumer) Push(datas []uint64) bool {
 	return false
 }
 
 type rightConsumer struct {
 }
 
-func (r *rightConsumer) Push(datas ...uint64) bool {
+func (r *rightConsumer) Push(datas []uint64) bool {
 	return true
 }
 
