@@ -1,8 +1,10 @@
 package lantern
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func TestNewNode(t *testing.T) {
@@ -99,11 +101,93 @@ func TestNewNodeExpire(t *testing.T) {
 
 func TestExpirationPut(t *testing.T) {
 	e := newExpiration(AllocPolicy)
-	for i := 0; i < 1e4; i++ {
+	N := 100000
+	for i := 0; i < N; i++ {
 		err := e.put(uint64(i))
 		if err != nil {
 			break
 		}
 	}
-	require.Equal(t, 1, 1)
+}
+
+func TestExpirationCleanExpire(t *testing.T) {
+	e := newExpiration(AllocPolicy)
+	N := 1000000
+	for i := 0; i < N; i++ {
+		err := e.put(uint64(i))
+		if err != nil {
+			break
+		}
+	}
+
+	end := make(chan struct{})
+	round := 1 << 10
+	count := 0
+	go func() {
+		for {
+			expectHead := e.head.next
+			expectTail := e.head
+			e.cleanExpire()
+			require.Equal(t, e.head, expectHead)
+			require.Equal(t, e.tail, expectTail)
+			count++
+			if count >= round {
+				break
+			}
+			fmt.Printf("round:%d size:%d\n", count, e.size())
+		}
+		end <- struct{}{}
+	}()
+	<-end
+	e.debug()
+}
+
+func TestExpirationComplicate(t *testing.T) {
+	e := newExpiration(AllocPolicy)
+
+	writeChan := make(chan struct{})
+	expireChan := make(chan struct{})
+
+	go func() {
+		N := 1000
+		round := 1 << 20
+		count := 0
+		for count < round {
+			for i := 0; i < N; i++ {
+				err := e.put(uint64(randomNumber(1, 100000000)))
+				if err != nil {
+					break
+				}
+				time.Sleep(time.Millisecond * 1)
+			}
+			time.Sleep(time.Millisecond * 100)
+			//fmt.Printf("write round:%d size:%d\n", count, e.size())
+			count++
+		}
+		writeChan <- struct{}{}
+	}()
+
+	go func() {
+		round := 1 << 30
+		count := 0
+		for count < round {
+			e.cleanExpire()
+			count++
+			time.Sleep(time.Second * 2)
+			//fmt.Printf("clean round:%d size:%d\n", count, e.size())
+		}
+		expireChan <- struct{}{}
+	}()
+
+	go func() {
+		for {
+			//fmt.Printf("size:%d\n", e.size())
+			e.debug()
+			time.Sleep(time.Second)
+		}
+	}()
+
+	// wait end
+	<-writeChan
+	<-expireChan
 }
