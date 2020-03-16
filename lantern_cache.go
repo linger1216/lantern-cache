@@ -1,6 +1,12 @@
 package lantern
 
 type LanternCache struct {
+	policy *defaultPolicy
+}
+
+func NewLanternCache() *LanternCache {
+	ret := &LanternCache{}
+	return ret
 }
 
 type Config struct {

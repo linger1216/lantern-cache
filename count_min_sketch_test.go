@@ -148,3 +148,13 @@ func TestCountMinSketchIncrementGet(t *testing.T) {
 		require.Equal(t, min1, min2)
 	}
 }
+
+func TestCountMinSketchIncrementGet_Lid(t *testing.T) {
+	N := uint64(1 << 4)
+	cms := newCountMinSketch(N)
+	cms.increment(4)
+	cms.increment(4)
+	cms.get(4)
+	cms.increment(6)
+
+}

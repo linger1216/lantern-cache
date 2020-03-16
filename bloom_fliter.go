@@ -1,6 +1,9 @@
 package lantern
 
-import "math"
+import (
+	"fmt"
+	"math"
+)
 
 // 返回
 // size 最小为512
@@ -20,6 +23,7 @@ func getSize(ui64 uint64) (size uint64, exponent uint64) {
 
 // todo
 // 纯理论的东西 不懂
+// 解释:https://sagi.io/2017/07/bloom-filters-for-the-perplexed/#appendix
 func calcSizeByWrongPositives(numEntries, wrongs float64) (uint64, uint64) {
 	size := -1 * numEntries * math.Log(wrongs) / math.Pow(float64(0.69314718056), 2)
 	locs := math.Ceil(float64(0.69314718056) * size / numEntries)
@@ -38,6 +42,7 @@ type bloomFilter struct {
 	// NumCounters should be 10,000,000 (10x). Each counter takes up 4 bits, so
 	// keeping 10,000,000 counters would require 5MB of memory.
 */
+// 不能超过2^64次方
 func newBloomFilter(numberCounter, para float64) *bloomFilter {
 	if numberCounter == 0 || para == 0 {
 		panic(ErrorBloomFilterInvalidPara)
@@ -81,9 +86,12 @@ func (bl *bloomFilter) highLow(hash uint64) (uint64, uint64) {
 
 // 通过好几轮来计算不同的值
 func (bl *bloomFilter) add(hash uint64) {
+	fmt.Printf("want to add %d\n", hash)
 	h, l := bl.highLow(hash)
 	for i := uint64(0); i < bl.round; i++ {
-		bl.bitset.set((h + i*l) & bl.mask)
+		index := (h + i*l) & bl.mask
+		fmt.Printf("round %d set %d\n", i, index)
+		bl.bitset.set(index)
 	}
 }
 

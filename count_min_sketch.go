@@ -8,14 +8,16 @@ import (
 
 // https://github.com/alabid/countminsketch/blob/master/count-min-sketch.pdf
 const (
-	HashRound        = 4
+	// 通过4轮的计算来保证唯一值
+	HashRound = 4
+	// 4bit来存频率, 最大是15, 有论文支持15表现的也很不错
 	MaxFrequentValue = 0x0f
 )
 
-// 4bit来存频率, 最大是15, 有论文支持15表现的也很不错
+// 这代表一行
 type countMinRow []byte
 
-// 上层要保证是2的幂
+// size要保证是2的幂
 func newCountMinRow(size uint64) countMinRow {
 	if !isPowerOfTwo(size) {
 		panic(ErrorNotPowerOfTwo)
@@ -137,7 +139,7 @@ func (c *countMinSketch) estimate(hashed uint64) uint8 {
 	return min
 }
 
-// 取每个hash算法的频率值
+// 取每个hash算法的频率值, 这时候不进行计算
 func (c *countMinSketch) get(hashed uint64) [HashRound]uint8 {
 	var ret [HashRound]uint8
 	for i := 0; i < HashRound; i++ {

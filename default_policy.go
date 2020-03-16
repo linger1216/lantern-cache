@@ -5,13 +5,13 @@ import (
 	"sync"
 )
 
-type caffeinePolicy struct {
+type defaultPolicy struct {
 	sync.RWMutex
 	coster  *coster
 	tinyLfu *tinyLfu
 }
 
-func (c *caffeinePolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, error) {
+func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, error) {
 	// go 1.14 defer performance is not problem
 	c.Lock()
 	defer c.Unlock()
@@ -63,7 +63,7 @@ func (c *caffeinePolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, er
 	return evict, true, nil
 }
 
-func (c *caffeinePolicy) minSample(pairs []costerPair) (uint64, int64, uint64, int) {
+func (c *defaultPolicy) minSample(pairs []costerPair) (uint64, int64, uint64, int) {
 	minHash, minCost, minHit, minIndex := uint64(math.MaxUint64), int64(math.MaxInt64), uint64(math.MaxUint64), 0
 	for i := range pairs {
 		if hit := c.tinyLfu.estimate(pairs[i].hash); hit < minHit {
