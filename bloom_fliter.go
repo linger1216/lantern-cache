@@ -106,7 +106,7 @@ func (bl *bloomFilter) has(hash uint64) bool {
 }
 
 func (bl *bloomFilter) addIfNotHas(hash uint64) bool {
-	if bl.has(hash) {
+	if !bl.has(hash) {
 		bl.add(hash)
 		return true
 	}

@@ -13,7 +13,7 @@ type tinyLfu struct {
 func newTinyLFU(n uint64) *tinyLfu {
 	return &tinyLfu{
 		countMinSketch: newCountMinSketch(n),
-		bloomFilter:    newBloomFilter(float64(n), 0.01),
+		bloomFilter:    newBloomFilter(float64(n), 0.0001),
 		total:          n,
 		currentCount:   0,
 	}
@@ -22,28 +22,31 @@ func newTinyLFU(n uint64) *tinyLfu {
 func (t *tinyLfu) Put(keyHash uint64) {
 	if add := t.bloomFilter.addIfNotHas(keyHash); add {
 		t.countMinSketch.increment(keyHash)
-		// 这里把逻辑放在这, 因为判断是否has本来就是有误差, 如果要精确的逻辑
-		// 不知道合不合适
 		t.currentCount++
 		if t.currentCount >= t.total {
 			t.reset()
 		}
 	}
+}
 
-	// maybe here
-	//t.currentCount++
-	//if t.currentCount >= t.total {
-	//	t.reset()
-	//}
+// todo
+// 原先的设计是get访问也算一次, 比如当前频率是1, 但get的同时, 也会算上一次计数, 变为2
+// 但我觉得没必要, 除非以后发现这是个精妙的设计, 但此时并没体会到
+func (p *tinyLfu) EstimateOriginal(key uint64) uint64 {
+	hits := p.countMinSketch.estimate(key)
+	if p.bloomFilter.has(key) {
+		hits++
+	}
+	return uint64(hits)
 }
 
 //
 func (t *tinyLfu) estimate(keyHash uint64) uint64 {
-	hit := t.countMinSketch.estimate(keyHash)
+	var ret uint64
 	if t.bloomFilter.has(keyHash) {
-		hit++
+		ret = uint64(t.countMinSketch.estimate(keyHash))
 	}
-	return uint64(hit)
+	return ret
 }
 
 func (t *tinyLfu) reset() {
