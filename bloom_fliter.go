@@ -21,7 +21,6 @@ func getSize(ui64 uint64) (size uint64, exponent uint64) {
 	return size, exponent
 }
 
-// todo
 // 纯理论的东西 不懂
 // 解释:https://sagi.io/2017/07/bloom-filters-for-the-perplexed/#appendix
 func calcSizeByWrongPositives(numEntries, wrongs float64) (uint64, uint64) {
@@ -95,7 +94,7 @@ func (bl *bloomFilter) add(hash uint64) {
 	}
 }
 
-func (bl *bloomFilter) has(hash uint64) bool {
+func (bl *bloomFilter) exist(hash uint64) bool {
 	h, l := bl.highLow(hash)
 	for i := uint64(0); i < bl.round; i++ {
 		if !bl.bitset.has((h + i*l) & bl.mask) {
@@ -105,8 +104,8 @@ func (bl *bloomFilter) has(hash uint64) bool {
 	return true
 }
 
-func (bl *bloomFilter) addIfNotHas(hash uint64) bool {
-	if !bl.has(hash) {
+func (bl *bloomFilter) addIfNotExist(hash uint64) bool {
+	if !bl.exist(hash) {
 		bl.add(hash)
 		return true
 	}

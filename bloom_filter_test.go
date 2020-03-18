@@ -15,7 +15,7 @@ func Test_D(t *testing.T) {
 func Test_SetGet(t *testing.T) {
 	bl := newBloomFilter(100, 0.001)
 	bl.add(6)
-	ret := bl.has(6)
-	ret = bl.has(5)
+	ret := bl.exist(6)
+	ret = bl.exist(5)
 	fmt.Printf("ret:%v", ret)
 }

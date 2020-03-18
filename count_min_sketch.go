@@ -6,11 +6,8 @@ import (
 	"time"
 )
 
-// https://github.com/alabid/countminsketch/blob/master/count-min-sketch.pdf
 const (
-	// 通过4轮的计算来保证唯一值
-	HashRound = 4
-	// 4bit来存频率, 最大是15, 有论文支持15表现的也很不错
+	HashRound        = 4
 	MaxFrequentValue = 0x0f
 )
 
@@ -47,7 +44,7 @@ func (c countMinRow) get(index uint64) uint8 {
 	// index/2找到具体的byte
 	// 根据奇偶找合适的值
 	// return byte(r[n/2]>>((n&1)*4)) & 0x0f
-	h, l := c.exact(c[index>>1])
+	h, l := c.getUnit(c[index>>1])
 	if index&1 == 1 {
 		return h
 	}
@@ -80,7 +77,7 @@ func (c countMinRow) string() string {
 }
 
 // 把一个字节的频率分别取出
-func (c countMinRow) exact(n byte) (uint8, uint8) {
+func (c countMinRow) getUnit(n byte) (uint8, uint8) {
 	return n >> 4, n & 0x0f
 }
 
@@ -90,6 +87,7 @@ type countMinSketch struct {
 	mask  uint64
 }
 
+// key最多的条数, 比如你设定100w是你的最大存储数量, 那么就设置1e6
 func newCountMinSketch(n uint64) *countMinSketch {
 	if n == 0 {
 		n = 64

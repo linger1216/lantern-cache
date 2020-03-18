@@ -4,7 +4,6 @@ const (
 	SampleCount = 5
 )
 
-// 成本计算器
 type costerPair struct {
 	hash uint64
 	cost int64
@@ -17,35 +16,18 @@ type coster struct {
 }
 
 func newCoster(max int64) *coster {
-	assert(max > 0, "cost max must be bigger than zero")
 	return &coster{max: max, used: 0, m: make(map[uint64]int64)}
 }
 
-func (c *coster) reset() {
-	c.clear()
-	c.max = 0
-}
-
-func (c *coster) clear() {
-	c.m = make(map[uint64]int64)
-	c.used = 0
-}
-
-func (c *coster) fillSample(in []costerPair) []costerPair {
-	if len(in) >= SampleCount {
-		return in
-	}
+func (c *coster) getSample(count uint) []costerPair {
+	ret := make([]costerPair, 0, count)
 	for hash, cost := range c.m {
-		in = append(in, costerPair{hash, cost})
-		if len(in) >= SampleCount {
-			return in
+		ret = append(ret, costerPair{hash, cost})
+		if len(ret) >= int(count) {
+			return ret
 		}
 	}
-	return in
-}
-
-func (c *coster) remain(cost int64) int64 {
-	return c.max - c.used - cost
+	return ret
 }
 
 func (c *coster) add(hashed uint64, cost int64) bool {
@@ -57,12 +39,45 @@ func (c *coster) add(hashed uint64, cost int64) bool {
 	return true
 }
 
-func (c *coster) updateIfHas(hashed uint64, cost int64) bool {
-	prevCost, ok := c.m[hashed]
-	if !ok {
-		return false
+func (c *coster) update(hashed uint64, cost int64) bool {
+	var prevCost int64
+	if _, ok := c.m[hashed]; ok {
+		prevCost = c.m[hashed]
 	}
-	return c.add(hashed, cost-prevCost)
+	dist := prevCost - cost
+	c.m[hashed] = cost
+	c.used += dist
+	return true
+}
+
+func (c *coster) updateIfExist(hashed uint64, cost int64) bool {
+	if _, ok := c.m[hashed]; ok {
+		return c.update(hashed, cost)
+	}
+	return false
+}
+
+func (c *coster) fillSample(in []costerPair, count uint) []costerPair {
+	if len(in) >= int(count) {
+		return in
+	}
+	for hash, cost := range c.m {
+		in = append(in, costerPair{hash, cost})
+		if len(in) >= int(count) {
+			return in
+		}
+	}
+	return in
+}
+
+func (c *coster) reset() {
+	c.m = make(map[uint64]int64)
+	c.used = 0
+	c.max = 0
+}
+
+func (c *coster) remain(cost int64) int64 {
+	return c.max - c.used - cost
 }
 
 func (c *coster) del(hashed uint64) {

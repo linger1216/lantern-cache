@@ -11,8 +11,18 @@ type defaultPolicy struct {
 	tinyLfu *tinyLfu
 }
 
+func newDefaultPolicy(maxKeyCount, maxCost uint64) *defaultPolicy {
+	ret := &defaultPolicy{}
+	ret.coster = newCoster(int64(maxCost))
+	ret.tinyLfu = newTinyLFU(maxKeyCount)
+	return ret
+}
+
+// 返回
+// 1. 淘汰的hash,cost
+// 2. 代表是否已经存入
+// 3. 错误
 func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, error) {
-	// go 1.14 defer performance is not problem
 	c.Lock()
 	defer c.Unlock()
 
@@ -21,8 +31,8 @@ func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, err
 		return nil, false, ErrorCostTooLarge
 	}
 
-	// 是否已经在cache中了
-	if c.coster.updateIfHas(hashed, cost) {
+	// 已经在cache中了, 更新一下cost即可
+	if c.coster.updateIfExist(hashed, cost) {
 		return nil, false, nil
 	}
 
@@ -34,27 +44,29 @@ func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, err
 
 	sample := make([]costerPair, 0, SampleCount)
 
-	hit := c.tinyLfu.estimate(hashed)
+	freq := c.tinyLfu.estimate(hashed)
 	evict := make([]*costerPair, 0)
 	for c.coster.remain(cost) < 0 {
-		sample = c.coster.fillSample(sample)
-		minHash, minCost, minHit, minIndex := c.minSample(sample)
-		if hit < minHit {
-			// 这里key明明不在里面, hit肯定比较低, 如果比较高, 其实应该是conflict比较高
-			// conflict比较高, 是不是也能代表价值, 这个说不好, 是我的理论盲区
-			// todo
+		sample = c.coster.fillSample(sample, SampleCount)
+		minHash, minCost, minFreq, minIndex := c.minSample(sample)
+
+		// 随机取了5个成本, 如果随机成本中最少的值都比我们即将要加入的值有价值
+		// 那么我们可以拒绝这个值添加
+		if freq < minFreq {
 			return nil, false, nil
 		}
 
-		// 当前的hash比较有价值
+		// 将最没有价值的值淘汰
 		c.coster.del(minHash)
 
-		// 将sample对应hash删除, 下一轮继续补充(如果成本还不够的话)
-		// 因为fill是append添加, 所以删除最后一个元素, 将min和最后一个元素替换
-		lastSamplePos := len(sample) - 1
-		if lastSamplePos != minIndex {
-			c.coster.m[uint64(minIndex)] = c.coster.m[uint64(lastSamplePos)]
-			sample = sample[:lastSamplePos]
+		// 假设[3]是成本最小值
+		// 1,2,3,4,5  before
+		// 1,2,5,4,'' after
+		// 空位留待下次补充
+		endSamplePos := len(sample) - 1
+		if endSamplePos != minIndex {
+			c.coster.m[uint64(minIndex)] = c.coster.m[uint64(endSamplePos)]
+			sample = sample[:endSamplePos]
 		}
 		evict = append(evict, &costerPair{minHash, minCost})
 	}
@@ -64,14 +76,14 @@ func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, err
 }
 
 func (c *defaultPolicy) minSample(pairs []costerPair) (uint64, int64, uint64, int) {
-	minHash, minCost, minHit, minIndex := uint64(math.MaxUint64), int64(math.MaxInt64), uint64(math.MaxUint64), 0
+	minHash, minCost, minFreq, minIndex := uint64(math.MaxUint64), int64(math.MaxInt64), uint64(math.MaxUint64), 0
 	for i := range pairs {
-		if hit := c.tinyLfu.estimate(pairs[i].hash); hit < minHit {
+		if freq := c.tinyLfu.estimate(pairs[i].hash); freq < minFreq {
 			minHash = pairs[i].hash
-			minHit = hit
+			minFreq = freq
 			minCost = pairs[i].cost
 			minIndex = i
 		}
 	}
-	return minHash, minCost, minHit, minIndex
+	return minHash, minCost, minFreq, minIndex
 }
