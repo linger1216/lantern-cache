@@ -65,7 +65,7 @@ func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, err
 		// 空位留待下次补充
 		endSamplePos := len(sample) - 1
 		if endSamplePos != minIndex {
-			c.coster.m[uint64(minIndex)] = c.coster.m[uint64(endSamplePos)]
+			sample[minIndex] = sample[endSamplePos]
 			sample = sample[:endSamplePos]
 		}
 		evict = append(evict, &costerPair{minHash, minCost})

@@ -1,13 +1,20 @@
 package lantern
 
-import "testing"
+import (
+	"fmt"
+	"testing"
+)
 
-func Test_Add(t *testing.T) {
-	p := newDefaultPolicy(10, 10)
-
-	for i := 0; i < 10; i++ {
-		p.add(uint64(i), 1)
+func Test_AddEvit(t *testing.T) {
+	p := newDefaultPolicy(10000, 10000)
+	for i := 0; i < 10000; i++ {
+		pair, save, err := p.add(uint64(randomNumber(1, 10000)), int64(randomNumber(1, 10)))
+		if err != nil {
+			fmt.Printf("err:%s\n", err.Error())
+			return
+		}
+		for _, v := range pair {
+			fmt.Printf("i:%d save:%v evict-hash:%d cost:%d\n", i, save, v.hash, v.cost)
+		}
 	}
-
-	p.add(uint64(99), 1)
 }
