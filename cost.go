@@ -4,11 +4,6 @@ const (
 	SampleCount = 5
 )
 
-type costerPair struct {
-	hash uint64
-	cost int64
-}
-
 type coster struct {
 	m    map[uint64]int64
 	max  int64
@@ -19,10 +14,10 @@ func newCoster(max int64) *coster {
 	return &coster{max: max, used: 0, m: make(map[uint64]int64)}
 }
 
-func (c *coster) getSample(count uint) []costerPair {
-	ret := make([]costerPair, 0, count)
+func (c *coster) getSample(count uint) []*entry {
+	ret := make([]*entry, 0, count)
 	for hash, cost := range c.m {
-		ret = append(ret, costerPair{hash, cost})
+		ret = append(ret, &entry{key: hash, cost: cost})
 		if len(ret) >= int(count) {
 			return ret
 		}
@@ -57,12 +52,12 @@ func (c *coster) updateIfExist(hashed uint64, cost int64) bool {
 	return false
 }
 
-func (c *coster) fillSample(in []costerPair, count uint) []costerPair {
+func (c *coster) fillSample(in []*entry, count uint) []*entry {
 	if len(in) >= int(count) {
 		return in
 	}
 	for hash, cost := range c.m {
-		in = append(in, costerPair{hash, cost})
+		in = append(in, &entry{key: hash, cost: cost})
 		if len(in) >= int(count) {
 			return in
 		}

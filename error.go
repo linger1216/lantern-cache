@@ -15,4 +15,8 @@ var (
 	// node
 	ErrorNodeFull    = fmt.Errorf("ErrorNodeFull")
 	ErrorNodeReadEof = fmt.Errorf("ErrorNodeReadEof index")
+
+	ErrorInvalidPara  = fmt.Errorf("ErrorInvalidPara")
+	ErrorNoExpiration = fmt.Errorf("ErrorNoExpiration")
+	ErrorNoEntry      = fmt.Errorf("ErrorNoEntry")
 )

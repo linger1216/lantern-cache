@@ -22,7 +22,7 @@ func newDefaultPolicy(maxKeyCount, maxCost uint64) *defaultPolicy {
 // 1. 淘汰的hash,cost
 // 2. 代表是否已经存入
 // 3. 错误
-func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, error) {
+func (c *defaultPolicy) put(key uint64, cost int64) ([]*entry, bool, error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -32,20 +32,20 @@ func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, err
 	}
 
 	// 已经在cache中了, 更新一下cost即可
-	if c.coster.updateIfExist(hashed, cost) {
+	if c.coster.updateIfExist(key, cost) {
 		return nil, false, nil
 	}
 
 	// 剩余成本够
 	if c.coster.remain(cost) > 0 {
-		c.coster.add(hashed, cost)
+		c.coster.add(key, cost)
 		return nil, true, nil
 	}
 
-	sample := make([]costerPair, 0, SampleCount)
+	sample := make([]*entry, 0, SampleCount)
 
-	freq := c.tinyLfu.estimate(hashed)
-	evict := make([]*costerPair, 0)
+	freq := c.tinyLfu.estimate(key)
+	evict := make([]*entry, 0)
 	for c.coster.remain(cost) < 0 {
 		sample = c.coster.fillSample(sample, SampleCount)
 		minHash, minCost, minFreq, minIndex := c.minSample(sample)
@@ -68,18 +68,18 @@ func (c *defaultPolicy) add(hashed uint64, cost int64) ([]*costerPair, bool, err
 			sample[minIndex] = sample[endSamplePos]
 			sample = sample[:endSamplePos]
 		}
-		evict = append(evict, &costerPair{minHash, minCost})
+		evict = append(evict, &entry{key: minHash, cost: minCost})
 	}
 
-	c.coster.add(hashed, cost)
+	c.coster.add(key, cost)
 	return evict, true, nil
 }
 
-func (c *defaultPolicy) minSample(pairs []costerPair) (uint64, int64, uint64, int) {
+func (c *defaultPolicy) minSample(pairs []*entry) (uint64, int64, uint64, int) {
 	minHash, minCost, minFreq, minIndex := uint64(math.MaxUint64), int64(math.MaxInt64), uint64(math.MaxUint64), 0
 	for i := range pairs {
-		if freq := c.tinyLfu.estimate(pairs[i].hash); freq < minFreq {
-			minHash = pairs[i].hash
+		if freq := c.tinyLfu.estimate(pairs[i].key); freq < minFreq {
+			minHash = pairs[i].key
 			minFreq = freq
 			minCost = pairs[i].cost
 			minIndex = i

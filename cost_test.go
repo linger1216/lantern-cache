@@ -2,11 +2,11 @@ package lantern
 
 //func TestCoster(t *testing.T) {
 //	c := newCoster(10)
-//	c.add(1, 1)
+//	c.put(1, 1)
 //	require.Equal(t, c.remain(0), int64(9))
-//	c.add(2, 1)
+//	c.put(2, 1)
 //	require.Equal(t, c.remain(0), int64(8))
-//	c.add(3, 1)
+//	c.put(3, 1)
 //	require.Equal(t, c.remain(0), int64(7))
 //	c.updateIfNotExist(3, 2)
 //	require.Equal(t, c.remain(0), int64(6))
