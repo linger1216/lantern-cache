@@ -1,13 +1,18 @@
 package lantern
 
-import "sync"
+import (
+	"fmt"
+	"sync"
+)
 
 type storeShared struct {
-	mask   uint64
-	shards []*mutexMap
+	mask            uint64
+	shards          []*mutexMap
+	storeExpiration *storeExpiration
+	onEvict         onEvictFunc
 }
 
-func newStoreShared(n uint64) *storeShared {
+func newStoreShared(n uint64, bucketInterval int64, onEvict onEvictFunc) *storeShared {
 	ret := &storeShared{}
 	if n <= 0 {
 		n = 256
@@ -23,7 +28,19 @@ func newStoreShared(n uint64) *storeShared {
 	}
 	ret.shards = shards
 	ret.mask = n - 1
+	ret.storeExpiration = newStoreExpiration(bucketInterval, ret.cleanBucket)
+	ret.onEvict = onEvict
 	return ret
+}
+
+func (s *storeShared) cleanBucket(m bucket) {
+	for key, conflict := range m {
+		fmt.Printf("del key:%d conflict:%d\n", key, conflict)
+		entry := s.Del(key, conflict)
+		if s.onEvict != nil {
+			s.onEvict(key, conflict, entry.value, entry.cost)
+		}
+	}
 }
 
 func (s *storeShared) Put(entry *entry) error {
@@ -34,12 +51,13 @@ func (s *storeShared) Get(key, conflict uint64) (interface{}, error) {
 	return s.shards[key&s.mask].Get(key, conflict)
 }
 
-func (s *storeShared) Del(key, conflict uint64) (uint64, interface{}) {
+func (s *storeShared) Del(key, conflict uint64) *entry {
 	return s.shards[key&s.mask].Del(key, conflict)
 }
 
-func (s *storeShared) Clean(policy *defaultPolicy, onEvict onEvictFunc) {
-
+func (s *storeShared) Clean() {
+	fmt.Printf("store clean\n")
+	s.storeExpiration.cleanUp()
 }
 
 type mutexMap struct {
@@ -70,19 +88,20 @@ func (s *mutexMap) Get(key, conflict uint64) (interface{}, error) {
 	return nil, ErrorNoEntry
 }
 
-func (s *mutexMap) Del(key, conflict uint64) (uint64, interface{}) {
+// conflict 0 代表强制删除
+func (s *mutexMap) Del(key, conflict uint64) *entry {
 	s.Lock()
 	defer s.Unlock()
 
 	entry, ok := s.m[key]
 	if !ok {
-		return 0, nil
+		return nil
 	}
 
 	if conflict != 0 && entry.conflict != conflict {
-		return 0, nil
+		return nil
 	}
 
 	delete(s.m, key)
-	return entry.conflict, entry.value
+	return entry
 }

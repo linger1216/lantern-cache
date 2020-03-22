@@ -2,23 +2,18 @@ package lantern
 
 import "testing"
 
-type wrongConsumer struct {
-}
-
-func (w *wrongConsumer) Push(datas []uint64) bool {
-	return false
-}
-
-type rightConsumer struct {
-}
-
-func (r *rightConsumer) Push(datas []uint64) bool {
-	return true
-}
-
-func TestRing(t *testing.T) {
-	ring := newRingBuffer(&rightConsumer{}, 16)
-	for i := uint64(0); i < 20; i++ {
+func TestRingBuffer(t *testing.T) {
+	ring := newRingBuffer(newDefaultPolicy(100, 100), 64)
+	for i := uint64(0); i < 1000; i++ {
 		ring.put(i)
 	}
+}
+
+func TestRingPoll(t *testing.T) {
+	policy := newDefaultPolicy(100, 100)
+	p := newRingPool(policy, 64)
+	for i := uint64(0); i < 1000; i++ {
+		p.put(i)
+	}
+	policy.close()
 }

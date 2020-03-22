@@ -14,7 +14,7 @@ func Test_AddEvit(t *testing.T) {
 			return
 		}
 		for _, v := range pair {
-			fmt.Printf("i:%d save:%v key:%d cost:%d\n", i, save, v.key, v.cost)
+			fmt.Printf("i:%d save:%v key:%d\n", i, save, v)
 		}
 	}
 }

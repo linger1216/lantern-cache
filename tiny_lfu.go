@@ -20,6 +20,13 @@ func newTinyLFU(n uint64) *tinyLfu {
 	}
 }
 
+// 访问记录 access 记录的地方
+func (t *tinyLfu) bulkIncrement(keys []uint64) {
+	for i := range keys {
+		t.increment(keys[i])
+	}
+}
+
 func (t *tinyLfu) increment(keyHash uint64) {
 	if add := t.bloomFilter.addIfNotExist(keyHash); add {
 		t.countMinSketch.increment(keyHash)

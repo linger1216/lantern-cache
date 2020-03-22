@@ -1,6 +1,7 @@
 package lantern
 
 import (
+	"fmt"
 	"math"
 	"sync"
 )
@@ -9,20 +10,55 @@ type defaultPolicy struct {
 	sync.RWMutex
 	coster  *coster
 	tinyLfu *tinyLfu
+
+	// 异步为了性能
+	access chan []uint64
+	stop   chan struct{}
 }
 
 func newDefaultPolicy(maxKeyCount, maxCost uint64) *defaultPolicy {
 	ret := &defaultPolicy{}
 	ret.coster = newCoster(int64(maxCost))
 	ret.tinyLfu = newTinyLFU(maxKeyCount)
+	ret.access = make(chan []uint64, 3)
+	ret.stop = make(chan struct{})
+	go ret.process()
 	return ret
+}
+
+func (c *defaultPolicy) close() {
+	c.stop <- struct{}{}
+	close(c.stop)
+	close(c.access)
+	fmt.Printf("policy closed\n")
+}
+
+func (c *defaultPolicy) process() {
+	for {
+		select {
+		case keys := <-c.access:
+			c.Lock()
+			//fmt.Printf("[policy] 处理访问记录:%d\n", len(keys))
+			c.tinyLfu.bulkIncrement(keys)
+			c.Unlock()
+		case <-c.stop:
+			break
+		}
+	}
+}
+
+func (c *defaultPolicy) pushLfu(keys []uint64) {
+	if len(keys) > 0 {
+		//fmt.Printf("[policy] 异步发送访问记录:%d\n", len(keys))
+		c.access <- keys
+	}
 }
 
 // 返回
 // 1. 淘汰的hash,cost
 // 2. 代表是否已经存入
 // 3. 错误
-func (c *defaultPolicy) put(key uint64, cost int64) ([]*entry, bool, error) {
+func (c *defaultPolicy) put(key uint64, cost int64) ([]uint64, bool, error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -45,10 +81,10 @@ func (c *defaultPolicy) put(key uint64, cost int64) ([]*entry, bool, error) {
 	sample := make([]*entry, 0, SampleCount)
 
 	freq := c.tinyLfu.estimate(key)
-	evict := make([]*entry, 0)
+	evict := make([]uint64, 0)
 	for c.coster.remain(cost) < 0 {
 		sample = c.coster.fillSample(sample, SampleCount)
-		minHash, minCost, minFreq, minIndex := c.minSample(sample)
+		minHash, _, minFreq, minIndex := c.minSample(sample)
 
 		// 随机取了5个成本, 如果随机成本中最少的值都比我们即将要加入的值有价值
 		// 那么我们可以拒绝这个值添加
@@ -68,7 +104,7 @@ func (c *defaultPolicy) put(key uint64, cost int64) ([]*entry, bool, error) {
 			sample[minIndex] = sample[endSamplePos]
 			sample = sample[:endSamplePos]
 		}
-		evict = append(evict, &entry{key: minHash, cost: minCost})
+		evict = append(evict, minHash)
 	}
 
 	c.coster.add(key, cost)

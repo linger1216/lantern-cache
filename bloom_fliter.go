@@ -1,7 +1,6 @@
 package lantern
 
 import (
-	"fmt"
 	"math"
 )
 
@@ -85,11 +84,11 @@ func (bl *bloomFilter) highLow(hash uint64) (uint64, uint64) {
 
 // 通过好几轮来计算不同的值
 func (bl *bloomFilter) add(hash uint64) {
-	fmt.Printf("want to put %d\n", hash)
+	//fmt.Printf("want to put %d\n", hash)
 	h, l := bl.highLow(hash)
 	for i := uint64(0); i < bl.round; i++ {
 		index := (h + i*l) & bl.mask
-		fmt.Printf("round %d set %d\n", i, index)
+		//fmt.Printf("round %d set %d\n", i, index)
 		bl.bitset.set(index)
 	}
 }
