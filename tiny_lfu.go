@@ -20,7 +20,7 @@ func newTinyLFU(n uint64) *tinyLfu {
 	}
 }
 
-// 访问记录 access 记录的地方
+// 访问记录 accessRingBuffer 记录的地方
 func (t *tinyLfu) bulkIncrement(keys []uint64) {
 	for i := range keys {
 		t.increment(keys[i])
