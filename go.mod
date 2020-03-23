@@ -7,6 +7,7 @@ require (
 	github.com/davecgh/go-spew v1.1.1
 	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/influxdata/influxdb v1.7.9 // indirect
+	github.com/json-iterator/go v1.1.9 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/profile v1.4.0
 	github.com/stretchr/testify v1.4.0

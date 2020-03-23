@@ -14,7 +14,8 @@ type entry struct {
 	expiration time.Time
 }
 
-type onEvictFunc func(key uint64, conflict uint64, value interface{}, cost int64)
+type OnEvictFunc func(key uint64, conflict uint64, value interface{}, cost int64)
+type CostFunc func(value interface{}) (cost int64, err error)
 
 type Cache struct {
 	policy           *defaultPolicy
@@ -24,53 +25,129 @@ type Cache struct {
 	cleanupTicker    *time.Ticker
 	stopChannel      chan struct{}
 	putEntryChannel  chan *entry
-	onEvict          onEvictFunc
+	onEvict          OnEvictFunc
+	costFunc         CostFunc
 }
 
 type Config struct {
-	Shards              uint64
-	MaxKeyCount         uint64
-	BucketInterval      int64
-	MaxCost             uint64
+	// 分片数
+	Shards uint64
+	// 最大的key数量, 这个值用于频率统计, 淘汰策略
+	MaxKeyCount uint64
+	// 这个值影响到ttl策略, 表示相差多少秒内的ttl数据会聚在一起
+	BucketInterval int64
+	// 最大的成本控制, 可以理解成value的长度和
+	MaxCost uint64
+	// 访问记录的缓冲区大小, 会影响到总容量
 	MaxAccessRingBuffer uint64
-	PutEntryBuffer      uint64
-	OnEvict             onEvictFunc
-	Hash                string
+	// put数据异步缓冲区大小 默认32K
+	PutEntryBuffer uint64
+	// 被淘汰的回调函数
+	OnEvict OnEvictFunc
+	// hash算法的选择, 目前仅仅支持fnv-xx
+	Hash string
+	// 成本计算的回调函数
+	CostFunc CostFunc
+}
+
+func (c *Config) defaultValue() {
+	if c.Shards == 0 {
+		c.Shards = 256
+	}
+
+	if c.MaxKeyCount == 0 {
+		c.MaxKeyCount = c.MaxCost * 10
+	}
+
+	if c.MaxKeyCount == 0 {
+		c.MaxKeyCount = 1e8
+	}
+
+	if c.BucketInterval == 0 {
+		c.BucketInterval = 5
+	}
+
+	// 访问记录的缓冲区大小, 会影响到总容量, 默认64
+	if c.MaxAccessRingBuffer == 0 {
+		c.MaxAccessRingBuffer = 64
+	}
+
+	// 发送缓冲区
+	if c.PutEntryBuffer == 0 {
+		c.PutEntryBuffer = 32 * 1024
+	}
+
+	if len(c.Hash) == 0 {
+		c.Hash = "fnv-xx"
+	}
+
+	// 成本函数
+	if c.CostFunc == nil {
+		c.CostFunc = DefaultCost
+	}
+}
+
+func DefaultCost(v interface{}) (int64, error) {
+	if v == nil {
+		return 1, nil
+	}
+
+	switch k := v.(type) {
+	case uint64:
+		return 8, nil
+	case string:
+		return int64(len(k)), nil
+	case []byte:
+		return int64(len(k)), nil
+	case byte:
+		return 1, nil
+	case int:
+		return 4, nil
+	case int32:
+		return 4, nil
+	case uint32:
+		return 4, nil
+	case int64:
+		return 8, nil
+	default:
+		// 这里有可能会有递归的问题, 不知道帮用户设置默认合不合适
+		//buf, err := jsoniter.ConfigFastest.Marshal(v)
+		//if err != nil {
+		//	return 0, nil
+		//}
+		//return int64(len(buf)), nil
+	}
+	return 1, nil
 }
 
 func NewLanternCache(conf *Config) *Cache {
+
+	switch {
+	case conf.MaxCost == 0:
+		panic("NumCounters can't be zero")
+	}
+
+	conf.defaultValue()
+
 	ret := &Cache{}
 
 	// todo
 	// need more test for this value
-	conf.BucketInterval = 5
 	switch strings.ToLower(conf.Hash) {
-	case "fnvxx":
+	case "fnv-xx":
 		fallthrough
 	default:
 		ret.hasher = newFnvXX()
 	}
 
 	ret.policy = newDefaultPolicy(conf.MaxKeyCount, conf.MaxCost)
-
-	// todo
-	// 不同引擎config
 	ret.store = newStoreShared(conf.Shards, conf.BucketInterval, conf.OnEvict)
-
-	if conf.MaxAccessRingBuffer == 0 {
-		conf.MaxAccessRingBuffer = 64
-	}
-
 	ret.accessRingBuffer = newRingPool(ret.policy, conf.MaxAccessRingBuffer)
-
+	ret.putEntryChannel = make(chan *entry, conf.PutEntryBuffer)
 	ret.onEvict = conf.OnEvict
 	ret.cleanupTicker = time.NewTicker(time.Duration(conf.BucketInterval) * time.Second / 2)
 	ret.stopChannel = make(chan struct{})
 
-	if conf.PutEntryBuffer == 0 {
-		conf.PutEntryBuffer = 32 * 1024
-	}
-	ret.putEntryChannel = make(chan *entry, conf.PutEntryBuffer)
 	go ret.process()
 	return ret
 }
@@ -91,6 +168,15 @@ func (c *Cache) process() {
 		case <-c.stopChannel:
 			return
 		case entry := <-c.putEntryChannel:
+			if entry.cost == 0 && c.costFunc != nil {
+				cost, err := c.costFunc(entry.value)
+				if err != nil {
+					fmt.Printf("err:%s\n", err.Error())
+					break
+				}
+				entry.cost = cost
+			}
+
 			evicts, saved, err := c.policy.put(entry.key, entry.cost)
 			if err != nil {
 				fmt.Printf("err:%s\n", err.Error())

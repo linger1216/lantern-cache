@@ -9,10 +9,10 @@ type storeShared struct {
 	mask            uint64
 	shards          []*mutexMap
 	storeExpiration *storeExpiration
-	onEvict         onEvictFunc
+	onEvict         OnEvictFunc
 }
 
-func newStoreShared(n uint64, bucketInterval int64, onEvict onEvictFunc) *storeShared {
+func newStoreShared(n uint64, bucketInterval int64, onEvict OnEvictFunc) *storeShared {
 	ret := &storeShared{}
 	if n <= 0 {
 		n = 256
