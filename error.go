@@ -19,4 +19,5 @@ var (
 	ErrorInvalidPara  = fmt.Errorf("ErrorInvalidPara")
 	ErrorNoExpiration = fmt.Errorf("ErrorNoExpiration")
 	ErrorNoEntry      = fmt.Errorf("ErrorNoEntry")
+	ErrorExpiration   = fmt.Errorf("ErrorExpiration")
 )

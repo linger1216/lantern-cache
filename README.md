@@ -100,3 +100,7 @@ PASS
 - MacBook Pro (13-inch, 2017, Two Thunderbolt 3 ports)
 - 2.3 GHz Intel Core i5
 - 8 GB 2133 MHz LPDDR
+
+
+
+

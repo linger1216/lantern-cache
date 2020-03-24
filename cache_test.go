@@ -6,7 +6,8 @@ import (
 
 func TestNewLanternCache(t *testing.T) {
 	c := NewLanternCache(&Config{
-		MaxCost: 1024 * 1024 * 1024,
+		MaxKeyCount: 1024 * 1024 * 10,
+		MaxCost:     1024 * 1024 * 1024,
 	})
 
 	c.close()

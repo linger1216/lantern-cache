@@ -184,11 +184,7 @@ func (c *Cache) process() {
 			}
 
 			if saved {
-				err = c.store.Put(entry)
-				if err != nil {
-					fmt.Printf("err:%s\n", err.Error())
-					break
-				}
+				c.store.Put(entry)
 			}
 
 			// 这些都是被淘汰的key, 已经在policy和coster删除掉了

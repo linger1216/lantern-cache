@@ -3,6 +3,7 @@ package lantern
 import (
 	"fmt"
 	"sync"
+	"time"
 )
 
 type storeShared struct {
@@ -23,12 +24,13 @@ func newStoreShared(n uint64, bucketInterval int64, onEvict OnEvictFunc) *storeS
 	}
 
 	shards := make([]*mutexMap, n)
+	ret.storeExpiration = newStoreExpiration(bucketInterval, ret.cleanBucket)
+
 	for i := uint64(0); i < n; i++ {
-		shards[i] = newMutexMap()
+		shards[i] = newMutexMap(ret.storeExpiration)
 	}
 	ret.shards = shards
 	ret.mask = n - 1
-	ret.storeExpiration = newStoreExpiration(bucketInterval, ret.cleanBucket)
 	ret.onEvict = onEvict
 	return ret
 }
@@ -43,8 +45,8 @@ func (s *storeShared) cleanBucket(m bucket) {
 	}
 }
 
-func (s *storeShared) Put(entry *entry) error {
-	return s.shards[entry.key&s.mask].Put(entry)
+func (s *storeShared) Put(entry *entry) {
+	s.shards[entry.key&s.mask].Put(entry)
 }
 
 func (s *storeShared) Get(key, conflict uint64) (interface{}, error) {
@@ -56,36 +58,60 @@ func (s *storeShared) Del(key, conflict uint64) *entry {
 }
 
 func (s *storeShared) Clean() {
-	fmt.Printf("store clean\n")
 	s.storeExpiration.cleanUp()
 }
 
 type mutexMap struct {
 	sync.RWMutex
-	m map[uint64]*entry
+	m      map[uint64]*entry
+	expire *storeExpiration
 }
 
-func newMutexMap() *mutexMap {
+func newMutexMap(expire *storeExpiration) *mutexMap {
+	assert(expire != nil, "expire is null")
 	ret := &mutexMap{}
 	ret.m = make(map[uint64]*entry)
+	ret.expire = expire
 	return ret
 }
 
-func (s *mutexMap) Put(entry *entry) error {
+func (s *mutexMap) Put(entry *entry) {
 	s.Lock()
 	defer s.Unlock()
+
+	currentEntry, ok := s.m[entry.key]
+	if !ok {
+		if !entry.expiration.IsZero() {
+			s.expire.put(entry.key, entry.conflict, entry.expiration)
+		}
+	} else {
+		if entry.conflict == currentEntry.conflict {
+			s.expire.update(currentEntry.key, currentEntry.expiration, entry.conflict, entry.expiration)
+		} else {
+			s.expire.put(entry.key, entry.conflict, entry.expiration)
+		}
+	}
 	s.m[entry.key] = entry
-	return nil
 }
 
 func (s *mutexMap) Get(key, conflict uint64) (interface{}, error) {
 	s.Lock()
-	defer s.Unlock()
+	entry, ok := s.m[key]
+	s.Unlock()
 
-	if v, ok := s.m[key]; ok && v.conflict == conflict {
-		return v.value, nil
+	if !ok {
+		return nil, ErrorNoEntry
 	}
-	return nil, ErrorNoEntry
+
+	if conflict != 0 && (conflict != entry.conflict) {
+		return nil, ErrorNoEntry
+	}
+
+	if !entry.expiration.IsZero() && time.Now().After(entry.expiration) {
+		return nil, ErrorExpiration
+	}
+
+	return entry.value, nil
 }
 
 // conflict 0 代表强制删除
@@ -102,6 +128,9 @@ func (s *mutexMap) Del(key, conflict uint64) *entry {
 		return nil
 	}
 
+	if !entry.expiration.IsZero() {
+		s.expire.del(key, entry.expiration)
+	}
 	delete(s.m, key)
 	return entry
 }
