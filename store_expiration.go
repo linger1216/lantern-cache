@@ -41,7 +41,7 @@ func (s *storeExpiration) _put(key, conflict uint64, expiration time.Time) {
 		s.buckets[storageBucketIndex] = make(bucket)
 	}
 	s.buckets[storageBucketIndex][key] = conflict
-	//fmt.Printf("[put] buckets[%d][%d] = %d %f\n", storageBucketIndex, key, conflict, time.Since(expiration).Seconds())
+	//fmt.Printf("[put] buckets[%d][%d] = %d %f\n", storageBucketIndex, hashed, conflict, time.Since(expiration).Seconds())
 }
 
 func (s *storeExpiration) put(key, conflict uint64, expiration time.Time) {

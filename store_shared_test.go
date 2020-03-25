@@ -36,7 +36,7 @@ func TestMutexMap_PutGet(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			m.Put(&entry{key: tt.key, conflict: tt.conflict1, value: tt.value1, cost: int64(len(tt.value1)), expiration: time.Now().Add(tt.t1 * time.Millisecond)})
+			m.Put(&entry{hashed: tt.key, conflict: tt.conflict1, value: tt.value1, cost: int64(len(tt.value1)), expiration: time.Now().Add(tt.t1 * time.Millisecond)})
 			time.Sleep(tt.wait * time.Millisecond)
 			actualValue, err := m.Get(tt.key, tt.conflict2)
 			require.Equal(t, actualValue, tt.expectValue)
@@ -48,8 +48,8 @@ func TestMutexMap_PutGet(t *testing.T) {
 func TestMutexMap_PutPutGet(t *testing.T) {
 	storeExpiration := newStoreExpiration(5, func(b bucket) {})
 	m := newMutexMap(storeExpiration)
-	m.Put(&entry{key: 1, conflict: 1, value: "val1", cost: 5, expiration: time.Now().Add(60 * time.Millisecond)})
-	m.Put(&entry{key: 1, conflict: 2, value: "val2", cost: 5, expiration: time.Now().Add(180 * time.Millisecond)})
+	m.Put(&entry{hashed: 1, conflict: 1, value: "val1", cost: 5, expiration: time.Now().Add(60 * time.Millisecond)})
+	m.Put(&entry{hashed: 1, conflict: 2, value: "val2", cost: 5, expiration: time.Now().Add(180 * time.Millisecond)})
 	{
 		actualValue, err := m.Get(1, 1)
 		require.Equal(t, actualValue, "val1")

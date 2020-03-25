@@ -1,33 +1,9 @@
 package lantern
 
 import (
-	"fmt"
 	"strings"
 	"time"
 )
-
-type entry struct {
-	key        uint64
-	conflict   uint64
-	value      interface{}
-	cost       int64
-	expiration time.Time
-}
-
-type OnEvictFunc func(key uint64, conflict uint64, value interface{}, cost int64)
-type CostFunc func(value interface{}) (cost int64, err error)
-
-type Cache struct {
-	policy           *defaultPolicy
-	store            *storeShared
-	hasher           hasher
-	accessRingBuffer *ringPoll
-	cleanupTicker    *time.Ticker
-	stopChannel      chan struct{}
-	putEntryChannel  chan *entry
-	onEvict          OnEvictFunc
-	costFunc         CostFunc
-}
 
 type Config struct {
 	// 分片数
@@ -48,6 +24,8 @@ type Config struct {
 	Hash string
 	// 成本计算的回调函数
 	CostFunc CostFunc
+	// debug所用
+	Log bool
 }
 
 func (c *Config) defaultValue() {
@@ -78,46 +56,26 @@ func (c *Config) defaultValue() {
 	}
 
 	if len(c.Hash) == 0 {
-		c.Hash = "fnv-xx"
+		c.Hash = HashFnv
 	}
 
 	// 成本函数
 	if c.CostFunc == nil {
-		c.CostFunc = DefaultCost
+		c.CostFunc = defaultCost
 	}
 }
 
-func DefaultCost(v interface{}) (int64, error) {
-	if v == nil {
-		return 1, nil
-	}
-
-	switch k := v.(type) {
-	case uint64:
-		return 8, nil
-	case string:
-		return int64(len(k)), nil
-	case []byte:
-		return int64(len(k)), nil
-	case byte:
-		return 1, nil
-	case int:
-		return 4, nil
-	case int32:
-		return 4, nil
-	case uint32:
-		return 4, nil
-	case int64:
-		return 8, nil
-	default:
-		// 这里有可能会有递归的问题, 不知道帮用户设置默认合不合适
-		//buf, err := jsoniter.ConfigFastest.Marshal(v)
-		//if err != nil {
-		//	return 0, nil
-		//}
-		//return int64(len(buf)), nil
-	}
-	return 1, nil
+type Cache struct {
+	policy           *defaultPolicy
+	store            *storeShared
+	hasher           hasher
+	accessRingBuffer *ringPoll
+	cleanupTicker    *time.Ticker
+	stopChannel      chan struct{}
+	putEntryChannel  chan *bigEntry
+	onEvict          OnEvictFunc
+	costFunc         CostFunc
+	logger           Logger
 }
 
 func NewLanternCache(conf *Config) *Cache {
@@ -126,30 +84,43 @@ func NewLanternCache(conf *Config) *Cache {
 	case conf.MaxCost == 0:
 		panic("NumCounters can't be zero")
 	}
-
 	conf.defaultValue()
 
-	ret := &Cache{}
-
-	// todo
-	// need more test for this value
+	c := &Cache{}
 	switch strings.ToLower(conf.Hash) {
-	case "fnv-xx":
-		fallthrough
+	case HashFnv:
+		c.hasher = &hashFnv{}
+	case HashXX:
+		c.hasher = &hashXX{}
 	default:
-		ret.hasher = newFnvXX()
+		c.hasher = &hashFnv{}
 	}
 
-	ret.policy = newDefaultPolicy(conf.MaxKeyCount, conf.MaxCost)
-	ret.store = newStoreShared(conf.Shards, conf.BucketInterval, conf.OnEvict)
-	ret.accessRingBuffer = newRingPool(ret.policy, conf.MaxAccessRingBuffer)
-	ret.putEntryChannel = make(chan *entry, conf.PutEntryBuffer)
-	ret.onEvict = conf.OnEvict
-	ret.cleanupTicker = time.NewTicker(time.Duration(conf.BucketInterval) * time.Second / 2)
-	ret.stopChannel = make(chan struct{})
+	c.policy = newDefaultPolicy(conf.MaxKeyCount, conf.MaxCost)
+	c.store = newStoreShared(conf.Shards, conf.BucketInterval, conf.OnEvict)
+	c.accessRingBuffer = newRingPool(c.policy, conf.MaxAccessRingBuffer)
+	c.putEntryChannel = make(chan *bigEntry, conf.PutEntryBuffer)
+	c.onEvict = conf.OnEvict
+	c.cleanupTicker = time.NewTicker(time.Duration(conf.BucketInterval) * time.Second / 2)
+	c.stopChannel = make(chan struct{})
 
-	go ret.process()
-	return ret
+	if conf.Log {
+		c.logger = DefaultLogger()
+	} else {
+		c.logger = NoneLogger()
+	}
+
+	ensure(c.policy != nil)
+	ensure(c.store != nil)
+	ensure(c.hasher != nil)
+	ensure(c.accessRingBuffer != nil)
+	ensure(c.cleanupTicker != nil)
+	ensure(c.putEntryChannel != nil)
+	ensure(c.costFunc != nil)
+	ensure(c.logger != nil)
+
+	go c.process()
+	return c
 }
 
 func (c *Cache) close() {
@@ -167,64 +138,58 @@ func (c *Cache) process() {
 			c.store.Clean()
 		case <-c.stopChannel:
 			return
-		case entry := <-c.putEntryChannel:
-			if entry.cost == 0 && c.costFunc != nil {
-				cost, err := c.costFunc(entry.value)
-				if err != nil {
-					fmt.Printf("err:%s\n", err.Error())
-					break
-				}
-				entry.cost = cost
+		case bigEntry := <-c.putEntryChannel:
+			bigEntry.hashed = c.hasher.hash(bigEntry.entry.key)
+			if bigEntry.cost <= 0 {
+				bigEntry.cost = c.costFunc(bigEntry.entry.value)
 			}
 
-			evicts, saved, err := c.policy.put(entry.key, entry.cost)
+			evicts, saved, err := c.policy.put(bigEntry.hashed, bigEntry.cost)
 			if err != nil {
-				fmt.Printf("err:%s\n", err.Error())
+				c.logger.Printf("policy put err:%s\n", err.Error())
 				break
 			}
 
 			if saved {
-				c.store.Put(entry)
+				c.store.Put(bigEntry.entry)
 			}
 
 			// 这些都是被淘汰的key, 已经在policy和coster删除掉了
 			// 这里要在del中强制删除
-			// entry 是有可能为空的, 因为在准备删除的时候被clean up自动清洗掉了
+			// bigEntry 是有可能为空的, 因为在准备删除的时候被clean up自动清洗掉了
 			for i := range evicts {
 				entry := c.store.Del(evicts[i], 0)
 				if entry != nil && c.onEvict != nil {
-					c.onEvict(entry.key, entry.conflict, entry.value, entry.cost)
+					c.onEvict(entry.key)
 				}
 			}
 		}
 	}
 }
 
-func (c *Cache) Get(key interface{}) (interface{}, error) {
-	keyHash, conflict := c.hasher.hash(key)
-	c.accessRingBuffer.put(keyHash)
-	return c.store.Get(keyHash, conflict)
-}
+//func (c *Cache) Get(key interface{}) (interface{}, error) {
+//	keyHash, conflict := c.hasher.hash(key)
+//	c.accessRingBuffer.put(keyHash)
+//	return c.store.Get(keyHash, conflict)
+//}
 
-func (c *Cache) Put(key, value interface{}, cost int64) error {
-	return c.PutWithTTL(key, value, cost, 0)
-}
+//func (c *Cache) Put(key []byte, value interface{}, cost int64) error {
+//	return c.PutWithTTL(hashed, value, cost, 0)
+//}
 
-func (c *Cache) PutWithTTL(key, value interface{}, cost int64, ttl time.Duration) error {
-	if c == nil || key == nil {
-		return ErrorInvalidPara
+func (c *Cache) PutWithTTL(key []byte, value interface{}, cost int64, ttl time.Duration) bool {
+	if c == nil || len(key) == 0 || ttl <= 0 || cost < 0 {
+		return false
 	}
-	if ttl <= 0 {
-		return ErrorNoExpiration
+	entry := &bigEntry{
+		entry: &entry{key: key, value: value, expiration: time.Now().Add(ttl)},
+		cost:  cost,
 	}
-	keyHash, conflict := c.hasher.hash(key)
-	entry := &entry{
-		key:        keyHash,
-		conflict:   conflict,
-		value:      value,
-		cost:       cost,
-		expiration: time.Now().Add(ttl),
+
+	select {
+	case c.putEntryChannel <- entry:
+		return true
+	default:
+		return false
 	}
-	c.putEntryChannel <- entry
-	return nil
 }

@@ -37,7 +37,7 @@ func newStoreShared(n uint64, bucketInterval int64, onEvict OnEvictFunc) *storeS
 
 func (s *storeShared) cleanBucket(m bucket) {
 	for key, conflict := range m {
-		fmt.Printf("del key:%d conflict:%d\n", key, conflict)
+		fmt.Printf("del hashed:%d conflict:%d\n", key, conflict)
 		entry := s.Del(key, conflict)
 		if s.onEvict != nil {
 			s.onEvict(key, conflict, entry.value, entry.cost)
@@ -46,7 +46,7 @@ func (s *storeShared) cleanBucket(m bucket) {
 }
 
 func (s *storeShared) Put(entry *entry) {
-	s.shards[entry.key&s.mask].Put(entry)
+	s.shards[entry.hashed&s.mask].Put(entry)
 }
 
 func (s *storeShared) Get(key, conflict uint64) (interface{}, error) {
@@ -79,19 +79,19 @@ func (s *mutexMap) Put(entry *entry) {
 	s.Lock()
 	defer s.Unlock()
 
-	currentEntry, ok := s.m[entry.key]
+	currentEntry, ok := s.m[entry.hashed]
 	if !ok {
 		if !entry.expiration.IsZero() {
-			s.expire.put(entry.key, entry.conflict, entry.expiration)
+			s.expire.put(entry.hashed, entry.conflict, entry.expiration)
 		}
 	} else {
 		if entry.conflict == currentEntry.conflict {
-			s.expire.update(currentEntry.key, currentEntry.expiration, entry.conflict, entry.expiration)
+			s.expire.update(currentEntry.hashed, currentEntry.expiration, entry.conflict, entry.expiration)
 		} else {
-			s.expire.put(entry.key, entry.conflict, entry.expiration)
+			s.expire.put(entry.hashed, entry.conflict, entry.expiration)
 		}
 	}
-	s.m[entry.key] = entry
+	s.m[entry.hashed] = entry
 }
 
 func (s *mutexMap) Get(key, conflict uint64) (interface{}, error) {

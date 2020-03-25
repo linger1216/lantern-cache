@@ -14,10 +14,10 @@ func newCoster(max int64) *coster {
 	return &coster{max: max, used: 0, m: make(map[uint64]int64)}
 }
 
-func (c *coster) getSample(count uint) []*entry {
-	ret := make([]*entry, 0, count)
+func (c *coster) getSample(count uint) []policyPair {
+	ret := make([]policyPair, 0, count)
 	for hash, cost := range c.m {
-		ret = append(ret, &entry{key: hash, cost: cost})
+		ret = append(ret, policyPair{hashed: hash, cost: cost})
 		if len(ret) >= int(count) {
 			return ret
 		}
@@ -52,12 +52,12 @@ func (c *coster) updateIfExist(hashed uint64, cost int64) bool {
 	return false
 }
 
-func (c *coster) fillSample(in []*entry, count uint) []*entry {
+func (c *coster) fillSample(in []policyPair, count uint) []policyPair {
 	if len(in) >= int(count) {
 		return in
 	}
 	for hash, cost := range c.m {
-		in = append(in, &entry{key: hash, cost: cost})
+		in = append(in, policyPair{hashed: hash, cost: cost})
 		if len(in) >= int(count) {
 			return in
 		}

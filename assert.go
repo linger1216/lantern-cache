@@ -7,3 +7,7 @@ func assert(condition bool, msg string, v ...interface{}) {
 		panic(fmt.Sprintf("assertion failed: "+msg, v...))
 	}
 }
+
+func ensure(condition bool) {
+	assert(condition, "something wrong")
+}

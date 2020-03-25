@@ -54,11 +54,16 @@ func (c *defaultPolicy) pushLfu(keys []uint64) {
 	}
 }
 
+type policyPair struct {
+	hashed uint64
+	cost   int64
+}
+
 // 返回
 // 1. 淘汰的hash,cost
 // 2. 代表是否已经存入
 // 3. 错误
-func (c *defaultPolicy) put(key uint64, cost int64) ([]uint64, bool, error) {
+func (c *defaultPolicy) put(hashed uint64, cost int64) ([]uint64, bool, error) {
 	c.Lock()
 	defer c.Unlock()
 
@@ -68,19 +73,19 @@ func (c *defaultPolicy) put(key uint64, cost int64) ([]uint64, bool, error) {
 	}
 
 	// 已经在cache中了, 更新一下cost即可
-	if c.coster.updateIfExist(key, cost) {
+	if c.coster.updateIfExist(hashed, cost) {
 		return nil, false, nil
 	}
 
 	// 剩余成本够
 	if c.coster.remain(cost) > 0 {
-		c.coster.add(key, cost)
+		c.coster.add(hashed, cost)
 		return nil, true, nil
 	}
 
-	sample := make([]*entry, 0, SampleCount)
+	sample := make([]policyPair, 0, SampleCount)
 
-	freq := c.tinyLfu.estimate(key)
+	freq := c.tinyLfu.estimate(hashed)
 	evict := make([]uint64, 0)
 	for c.coster.remain(cost) < 0 {
 		sample = c.coster.fillSample(sample, SampleCount)
@@ -107,15 +112,15 @@ func (c *defaultPolicy) put(key uint64, cost int64) ([]uint64, bool, error) {
 		evict = append(evict, minHash)
 	}
 
-	c.coster.add(key, cost)
+	c.coster.add(hashed, cost)
 	return evict, true, nil
 }
 
-func (c *defaultPolicy) minSample(pairs []*entry) (uint64, int64, uint64, int) {
+func (c *defaultPolicy) minSample(pairs []policyPair) (uint64, int64, uint64, int) {
 	minHash, minCost, minFreq, minIndex := uint64(math.MaxUint64), int64(math.MaxInt64), uint64(math.MaxUint64), 0
 	for i := range pairs {
-		if freq := c.tinyLfu.estimate(pairs[i].key); freq < minFreq {
-			minHash = pairs[i].key
+		if freq := c.tinyLfu.estimate(pairs[i].hashed); freq < minFreq {
+			minHash = pairs[i].hashed
 			minFreq = freq
 			minCost = pairs[i].cost
 			minIndex = i

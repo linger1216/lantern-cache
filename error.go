@@ -20,4 +20,6 @@ var (
 	ErrorNoExpiration = fmt.Errorf("ErrorNoExpiration")
 	ErrorNoEntry      = fmt.Errorf("ErrorNoEntry")
 	ErrorExpiration   = fmt.Errorf("ErrorExpiration")
+
+	ErrorUnknowSize = fmt.Errorf("ErrorUnknowSize")
 )

@@ -21,8 +21,8 @@ func TestNewLanternCache(t *testing.T) {
 //		MaxCost:             1024,
 //		MaxAccessRingBuffer: 64,
 //		PutEntryBuffer:      256,
-//		OnEvict: func(key uint64, conflict uint64, value interface{}, cost int64) {
-//			fmt.Printf("[evict] key:%d conflict:%d val:%s cost:%d\n", key, conflict, value.(string), cost)
+//		OnEvict: func(hashed uint64, conflict uint64, value interface{}, cost int64) {
+//			fmt.Printf("[evict] hashed:%d conflict:%d val:%s cost:%d\n", hashed, conflict, value.(string), cost)
 //		},
 //		Hash:     "fnv-xx",
 //		CostFunc: nil,
