@@ -89,9 +89,11 @@ func NewLanternCache(conf *Config) *Cache {
 	c := &Cache{}
 	switch strings.ToLower(conf.Hash) {
 	case HashFnv:
-		c.hasher = &fnvxx{}
+		c.hasher = &hashFnv{}
+	case HashXX:
+		c.hasher = &hashXX{}
 	default:
-		c.hasher = &fnvxx{}
+		c.hasher = &hashFnv{}
 	}
 
 	c.policy = newDefaultPolicy(conf.MaxKeyCount, conf.MaxCost)
@@ -137,7 +139,7 @@ func (c *Cache) process() {
 		case <-c.stopChannel:
 			return
 		case bigEntry := <-c.putEntryChannel:
-			bigEntry.hashed, bigEntry.conflict = c.hasher.hash(str2bytes(bigEntry.entry.key))
+			bigEntry.hashed = c.hasher.hash(bigEntry.entry.key)
 			if bigEntry.cost <= 0 {
 				bigEntry.cost = c.costFunc(bigEntry.entry.value)
 			}
@@ -149,7 +151,7 @@ func (c *Cache) process() {
 			}
 
 			if saved {
-				c.store.Put(bigEntry.hashed, bigEntry.conflict, bigEntry.entry)
+				c.store.Put(bigEntry.entry)
 			}
 
 			// 这些都是被淘汰的key, 已经在policy和coster删除掉了
@@ -175,7 +177,7 @@ func (c *Cache) process() {
 //	return c.PutWithTTL(hashed, value, cost, 0)
 //}
 
-func (c *Cache) PutWithTTL(key string, value interface{}, cost int64, ttl time.Duration) bool {
+func (c *Cache) PutWithTTL(key []byte, value interface{}, cost int64, ttl time.Duration) bool {
 	if c == nil || len(key) == 0 || ttl <= 0 || cost < 0 {
 		return false
 	}

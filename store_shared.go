@@ -1,6 +1,7 @@
 package lantern
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -36,6 +37,7 @@ func newStoreShared(n uint64, bucketInterval int64, onEvict OnEvictFunc) *storeS
 
 func (s *storeShared) cleanBucket(m bucket) {
 	for key, conflict := range m {
+		fmt.Printf("del hashed:%d conflict:%d\n", key, conflict)
 		entry := s.Del(key, conflict)
 		if s.onEvict != nil {
 			s.onEvict(key, conflict, entry.value, entry.cost)
@@ -43,16 +45,16 @@ func (s *storeShared) cleanBucket(m bucket) {
 	}
 }
 
-func (s *storeShared) Put(hashed, conflict uint64, entry *entry) {
-	s.shards[hashed&s.mask].Put(hashed, conflict, entry)
+func (s *storeShared) Put(entry *entry) {
+	s.shards[entry.hashed&s.mask].Put(entry)
 }
 
-func (s *storeShared) Get(hashed, conflict uint64, key string) (interface{}, bool) {
-	return s.shards[hashed&s.mask].Get(key)
+func (s *storeShared) Get(key, conflict uint64) (interface{}, error) {
+	return s.shards[key&s.mask].Get(key, conflict)
 }
 
-func (s *storeShared) Del(hashed, conflict uint64, key string) {
-	s.shards[hashed&s.mask].Del(hashed, conflict, key)
+func (s *storeShared) Del(key, conflict uint64) *entry {
+	return s.shards[key&s.mask].Del(key, conflict)
 }
 
 func (s *storeShared) Clean() {
@@ -61,83 +63,74 @@ func (s *storeShared) Clean() {
 
 type mutexMap struct {
 	sync.RWMutex
-	m      map[string]*entry
+	m      map[uint64]*entry
 	expire *storeExpiration
 }
 
 func newMutexMap(expire *storeExpiration) *mutexMap {
 	assert(expire != nil, "expire is null")
 	ret := &mutexMap{}
-	ret.m = make(map[string]*entry)
+	ret.m = make(map[uint64]*entry)
 	ret.expire = expire
 	return ret
 }
 
-func (s *mutexMap) Put(hashed, conflict uint64, entry *entry) {
+func (s *mutexMap) Put(entry *entry) {
 	s.Lock()
 	defer s.Unlock()
 
-	currentEntry, founded := s.m[entry.key]
-	if !founded {
+	currentEntry, ok := s.m[entry.hashed]
+	if !ok {
 		if !entry.expiration.IsZero() {
-			// 将key抽象化了hash, conflict
-			s.expire.put(hashed, conflict, entry.expiration)
+			s.expire.put(entry.hashed, entry.conflict, entry.expiration)
 		}
 	} else {
-		// 用之前的hash去寻找记录
-		currentConflict := s.expire.get(hashed, currentEntry.expiration)
-		if conflict == currentConflict {
-			if !entry.expiration.IsZero() {
-				// 新的过期时间是0, 意味着过期时间更新
-				s.expire.update(hashed, currentEntry.expiration, conflict, entry.expiration)
-			} else {
-				// 新的过期时间是0, 意味着没有过期时间
-				s.expire.del(hashed, currentEntry.expiration)
-			}
+		if entry.conflict == currentEntry.conflict {
+			s.expire.update(currentEntry.hashed, currentEntry.expiration, entry.conflict, entry.expiration)
 		} else {
-			// 这里应该是碰到了hash冲突
-			// 同样的hashed, 但取出来的entry, conflict不一样.
-			// 这里还是采取插入处理, 插入也会引入2种情况:
-			// 1: 完美插入, 因为过期时间会决定bucket, 虽然相同的key, 但不会冲突
-			// 2: 覆盖, 此时bucket也相同, 这就没办法了 (也就是说此时只能保留一条expiration过期时间)
-			if !entry.expiration.IsZero() {
-				s.expire.put(hashed, conflict, entry.expiration)
-			}
+			s.expire.put(entry.hashed, entry.conflict, entry.expiration)
 		}
 	}
-	s.m[entry.key] = entry
+	s.m[entry.hashed] = entry
 }
 
-func (s *mutexMap) Get(key string) (interface{}, bool) {
+func (s *mutexMap) Get(key, conflict uint64) (interface{}, error) {
 	s.Lock()
 	entry, ok := s.m[key]
 	s.Unlock()
 
 	if !ok {
-		return nil, false
+		return nil, ErrorNoEntry
 	}
 
-	// 这里没有检测过期expire存放的conflict是不是和key完全的一致
-	// 因为在put时候已经做了处理
+	if conflict != 0 && (conflict != entry.conflict) {
+		return nil, ErrorNoEntry
+	}
+
 	if !entry.expiration.IsZero() && time.Now().After(entry.expiration) {
-		return nil, false
+		return nil, ErrorExpiration
 	}
 
-	return entry.value, true
+	return entry.value, nil
 }
 
-func (s *mutexMap) Del(hashed, conflict uint64, key string) {
+// conflict 0 代表强制删除
+func (s *mutexMap) Del(key, conflict uint64) *entry {
 	s.Lock()
 	defer s.Unlock()
 
-	if currentEntry, founded := s.m[key]; founded {
-		if currentConflict := s.expire.get(hashed, currentEntry.expiration); conflict == currentConflict {
-			s.expire.del(hashed, currentEntry.expiration)
-		}
-		// else 如下:
-		// 这里应该是碰到了hash冲突
-		// 同样的hashed, 但取出来的entry, conflict不一样.
-		// 现在是这样的情况, key相同, 但entry, conflict不一样, 应该是不太可能
+	entry, ok := s.m[key]
+	if !ok {
+		return nil
+	}
+
+	if conflict != 0 && entry.conflict != conflict {
+		return nil
+	}
+
+	if !entry.expiration.IsZero() {
+		s.expire.del(key, entry.expiration)
 	}
 	delete(s.m, key)
+	return entry
 }
