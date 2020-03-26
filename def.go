@@ -52,6 +52,8 @@ func defaultCost(v interface{}) int64 {
 
 type entry struct {
 	key        []byte
+	hashed     uint64
+	cost       int64
 	value      interface{}
 	expiration time.Time
 }
