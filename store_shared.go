@@ -1,7 +1,6 @@
 package lantern
 
 import (
-	"fmt"
 	"sync"
 	"time"
 )
@@ -37,10 +36,9 @@ func newStoreShared(n uint64, bucketInterval int64, onEvict OnEvictFunc) *storeS
 
 func (s *storeShared) cleanBucket(m bucket) {
 	for key, conflict := range m {
-		fmt.Printf("del hashed:%d conflict:%d\n", key, conflict)
 		entry := s.Del(key, conflict)
-		if s.onEvict != nil {
-			s.onEvict(key, conflict, entry.value, entry.cost)
+		if entry != nil && s.onEvict != nil {
+			s.onEvict(key, conflict, entry.value)
 		}
 	}
 }
@@ -49,12 +47,12 @@ func (s *storeShared) Put(entry *entry) {
 	s.shards[entry.hashed&s.mask].Put(entry)
 }
 
-func (s *storeShared) Get(key, conflict uint64) (interface{}, error) {
-	return s.shards[key&s.mask].Get(key, conflict)
+func (s *storeShared) Get(hashed, conflict uint64) (interface{}, bool) {
+	return s.shards[hashed&s.mask].Get(hashed, conflict)
 }
 
-func (s *storeShared) Del(key, conflict uint64) *entry {
-	return s.shards[key&s.mask].Del(key, conflict)
+func (s *storeShared) Del(hashed, conflict uint64) *entry {
+	return s.shards[hashed&s.mask].Del(hashed, conflict)
 }
 
 func (s *storeShared) Clean() {
@@ -79,42 +77,52 @@ func (s *mutexMap) Put(entry *entry) {
 	s.Lock()
 	defer s.Unlock()
 
-	currentEntry, ok := s.m[entry.hashed]
-	if !ok {
+	toInsert := true
+	if currentEntry, founded := s.m[entry.hashed]; founded {
+		toInsert = false
+		// 用之前的hash去寻找记录
+		currentConflict := s.expire.get(entry.hashed, currentEntry.expiration)
+		if entry.conflict == currentConflict {
+			if !entry.expiration.IsZero() {
+				// 新的过期时间存在, 意味着过期时间更新
+				s.expire.update(entry.hashed, currentEntry.expiration, entry.conflict, entry.expiration)
+			} else {
+				// 新的过期时间是0, 意味着没有过期时间
+				s.expire.del(entry.hashed, currentEntry.expiration)
+			}
+		}
+	}
+
+	if toInsert {
 		if !entry.expiration.IsZero() {
 			s.expire.put(entry.hashed, entry.conflict, entry.expiration)
 		}
-	} else {
-		if entry.conflict == currentEntry.conflict {
-			s.expire.update(currentEntry.hashed, currentEntry.expiration, entry.conflict, entry.expiration)
-		} else {
-			s.expire.put(entry.hashed, entry.conflict, entry.expiration)
-		}
+		s.m[entry.hashed] = entry
 	}
-	s.m[entry.hashed] = entry
 }
 
-func (s *mutexMap) Get(key, conflict uint64) (interface{}, error) {
+func (s *mutexMap) Get(key, conflict uint64) (interface{}, bool) {
 	s.Lock()
 	entry, ok := s.m[key]
 	s.Unlock()
 
 	if !ok {
-		return nil, ErrorNoEntry
+		return nil, false
 	}
 
-	if conflict != 0 && (conflict != entry.conflict) {
-		return nil, ErrorNoEntry
+	// todo
+	// 等于0的场景, 还要思考
+	if conflict != entry.conflict {
+		return nil, false
 	}
 
 	if !entry.expiration.IsZero() && time.Now().After(entry.expiration) {
-		return nil, ErrorExpiration
+		return nil, false
 	}
 
-	return entry.value, nil
+	return entry.value, true
 }
 
-// conflict 0 代表强制删除
 func (s *mutexMap) Del(key, conflict uint64) *entry {
 	s.Lock()
 	defer s.Unlock()
@@ -124,6 +132,7 @@ func (s *mutexMap) Del(key, conflict uint64) *entry {
 		return nil
 	}
 
+	// conflict 0 代表强制删除, 给policy预备的
 	if conflict != 0 && entry.conflict != conflict {
 		return nil
 	}
@@ -131,6 +140,7 @@ func (s *mutexMap) Del(key, conflict uint64) *entry {
 	if !entry.expiration.IsZero() {
 		s.expire.del(key, entry.expiration)
 	}
+
 	delete(s.m, key)
 	return entry
 }

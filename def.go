@@ -18,8 +18,8 @@ const (
 	OffsetSizeOf              = 40
 	LoopSizeOf                = 64 - OffsetSizeOf
 
-	HashFnv = "fnv"
-	HashXX  = "xx"
+	HashFnvXX = "fnv-xx"
+	HashMemXX = "mem-xx"
 )
 
 func defaultCost(v interface{}) int64 {
@@ -51,18 +51,18 @@ func defaultCost(v interface{}) int64 {
 }
 
 type entry struct {
-	key        []byte
+	// hashed 可以考虑是不是删除
 	hashed     uint64
-	cost       int64
+	conflict   uint64
 	value      interface{}
 	expiration time.Time
 }
 
 type bigEntry struct {
-	entry  *entry
-	hashed uint64
-	cost   int64
+	entry *entry
+	key   interface{}
+	cost  int64
 }
 
-type OnEvictFunc func(key []byte)
+type OnEvictFunc func(hashed, conflict uint64, val interface{})
 type CostFunc func(value interface{}) (cost int64)

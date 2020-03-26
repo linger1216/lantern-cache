@@ -98,14 +98,17 @@ func (s *storeExpiration) update(key uint64, expiration time.Time, newConflict u
 
 func (s *storeExpiration) cleanUp() int {
 	s.Lock()
-	defer s.Unlock()
 	cleanBucketIndex := s._cleanBucketIndex(time.Now())
-	if m, ok := s.buckets[cleanBucketIndex]; ok {
+	m, ok := s.buckets[cleanBucketIndex]
+	if ok {
 		fmt.Printf("[clean] buckets[%d]\n", cleanBucketIndex)
 		delete(s.buckets, cleanBucketIndex)
+		s.Unlock()
 		if s.callback != nil {
 			s.callback(m)
 		}
+	} else {
+		s.Unlock()
 	}
 	return len(s.buckets)
 }
