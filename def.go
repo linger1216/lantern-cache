@@ -19,7 +19,6 @@ const (
 	LoopSizeOf                = 64 - OffsetSizeOf
 
 	HashFnv = "fnv"
-	HashXX  = "xx"
 )
 
 func defaultCost(v interface{}) int64 {
@@ -51,16 +50,27 @@ func defaultCost(v interface{}) int64 {
 }
 
 type entry struct {
-	key        []byte
+	key        string
 	value      interface{}
 	expiration time.Time
 }
 
 type bigEntry struct {
-	entry  *entry
-	hashed uint64
-	cost   int64
+	entry    *entry
+	hashed   uint64
+	conflict uint64
+	cost     int64
 }
 
-type OnEvictFunc func(key []byte)
+type OnEvictFunc func(key string)
 type CostFunc func(value interface{}) (cost int64)
+
+func str2bytes(s string) []byte {
+	x := (*[2]uintptr)(unsafe.Pointer(&s))
+	h := [3]uintptr{x[0], x[1], x[1]}
+	return *(*[]byte)(unsafe.Pointer(&h))
+}
+
+func bytes2str(b []byte) string {
+	return *(*string)(unsafe.Pointer(&b))
+}
