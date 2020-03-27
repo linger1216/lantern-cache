@@ -128,3 +128,13 @@ func (c *defaultPolicy) minSample(pairs []policyPair) (uint64, int64, uint64, in
 	}
 	return minHash, minCost, minFreq, minIndex
 }
+
+// for test
+func (c *defaultPolicy) get(hashed uint64) (cost int64, freq uint64) {
+	c.RLock()
+	defer c.RUnlock()
+
+	cost = c.coster.get(hashed)
+	freq = c.tinyLfu.estimate(hashed)
+	return
+}

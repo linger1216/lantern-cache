@@ -147,29 +147,33 @@ func (c *Cache) process() {
 		case <-c.stopChannel:
 			return
 		case bigEntry := <-c.putEntryChannel:
-			bigEntry.entry.hashed, bigEntry.entry.conflict = c.hasher.hash(bigEntry.key)
-			if bigEntry.cost <= 0 {
-				bigEntry.cost = c.costFunc(bigEntry.entry.value)
-			}
-			evicts, saved, err := c.policy.put(bigEntry.entry.hashed, bigEntry.cost)
-			if err != nil {
-				c.logger.Printf("policy put err:%s\n", err.Error())
-				break
-			}
+			c._save(bigEntry)
+		}
+	}
+}
 
-			if saved {
-				c.store.Put(bigEntry.entry)
-			}
+func (c *Cache) _save(bigEntry *bigEntry) {
+	bigEntry.entry.hashed, bigEntry.entry.conflict = c.hasher.hash(bigEntry.key)
+	if bigEntry.cost <= 0 {
+		bigEntry.cost = c.costFunc(bigEntry.entry.value)
+	}
+	evicts, saved, err := c.policy.put(bigEntry.entry.hashed, bigEntry.cost)
+	if err != nil {
+		c.logger.Printf("policy put err:%s\n", err.Error())
+		return
+	}
 
-			// 这些都是被淘汰的key, 已经在policy和coster删除掉了
-			// 这里要在del中强制删除
-			// bigEntry 是有可能为空的, 因为在准备删除的时候被clean up自动清洗掉了
-			for i := range evicts {
-				entry := c.store.Del(evicts[i], 0)
-				if entry != nil && c.onEvict != nil {
-					c.onEvict(entry.hashed, entry.conflict, entry.value)
-				}
-			}
+	if saved {
+		c.store.Put(bigEntry.entry)
+	}
+
+	// 这些都是被淘汰的key, 已经在policy和coster删除掉了
+	// 这里要在del中强制删除
+	// bigEntry 是有可能为空的, 因为在准备删除的时候被clean up自动清洗掉了
+	for i := range evicts {
+		entry := c.store.Del(evicts[i], 0)
+		if entry != nil && c.onEvict != nil {
+			c.onEvict(entry.hashed, entry.conflict, entry.value)
 		}
 	}
 }
@@ -214,4 +218,33 @@ func (c *Cache) PutWithTTL(key interface{}, value interface{}, cost int64, ttl t
 	default:
 		return false
 	}
+}
+
+func (c *Cache) PutSync(key interface{}, value interface{}, cost int64) bool {
+	return c.PutWithTTLSync(key, value, cost, 0)
+}
+
+func (c *Cache) PutWithTTLSync(key interface{}, value interface{}, cost int64, ttl time.Duration) bool {
+	if c == nil || key == nil || ttl < 0 || cost < 0 {
+		return false
+	}
+
+	var expiration time.Time
+	switch {
+	case ttl == 0:
+		break
+	case ttl < 0:
+		return false
+	default:
+		expiration = time.Now().Add(ttl)
+	}
+
+	entry := &bigEntry{
+		entry: &entry{value: value, expiration: expiration},
+		key:   key,
+		cost:  cost,
+	}
+
+	c._save(entry)
+	return true
 }

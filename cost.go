@@ -81,3 +81,11 @@ func (c *coster) del(hashed uint64) {
 		delete(c.m, hashed)
 	}
 }
+
+// for test case
+func (c *coster) get(hashed uint64) int64 {
+	if v, ok := c.m[hashed]; ok {
+		return v
+	}
+	return 0
+}
