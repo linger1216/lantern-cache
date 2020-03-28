@@ -1,29 +1,57 @@
 package lantern
 
-import "fmt"
+import (
+	"sync/atomic"
+)
 
-type Stats struct {
-	Gets       uint64
-	Puts       uint64
-	Errors     uint64
-	Hits       uint64
-	Misses     uint64
-	Collisions uint64
+type variable struct {
+	doNotUse [9]*uint64
+	val      *uint64
 }
 
-func (s *Stats) String() string {
-	return fmt.Sprintf("hit:%f err:%f collisions:%f",
-		float32(s.Hits)/float32(s.Gets),
-		float32(s.Errors)/float32(s.Gets+s.Puts),
-		float32(s.Collisions)/float32(s.Gets+s.Puts))
+func newVariable() *variable {
+	ret := &variable{}
+	for i := 0; i < 9; i++ {
+		ret.doNotUse[i] = new(uint64)
+	}
+	ret.val = new(uint64)
+	return ret
 }
 
-func (s *Stats) Raw() string {
-	return fmt.Sprintf("get:%d put:%d err:%d hit:%d miss:%d collisions:%d",
-		s.Gets,
-		s.Puts,
-		s.Errors,
-		s.Hits,
-		s.Misses,
-		s.Collisions)
+func (p *variable) add(delta uint64) {
+	if p == nil {
+		return
+	}
+	atomic.AddUint64(p.val, delta)
+}
+
+func (p *variable) get() uint64 {
+	if p == nil {
+		return 0
+	}
+	return atomic.LoadUint64(p.val)
+}
+
+type stats struct {
+	hit       *variable
+	miss      *variable
+	keyAdd    *variable
+	keyUpdate *variable
+	keyEvict  *variable
+	costAdd   *variable
+	costEvict *variable
+	rejects   *variable
+}
+
+func newStats() *stats {
+	ret := &stats{}
+	ret.hit = newVariable()
+	ret.miss = newVariable()
+	ret.keyAdd = newVariable()
+	ret.keyUpdate = newVariable()
+	ret.keyEvict = newVariable()
+	ret.costAdd = newVariable()
+	ret.costEvict = newVariable()
+	ret.rejects = newVariable()
+	return ret
 }

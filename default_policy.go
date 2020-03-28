@@ -38,7 +38,6 @@ func (c *defaultPolicy) process() {
 		select {
 		case keys := <-c.access:
 			c.Lock()
-			//fmt.Printf("[policy] 处理访问记录:%d\n", len(keys))
 			c.tinyLfu.bulkIncrement(keys)
 			c.Unlock()
 		case <-c.stop:
@@ -49,7 +48,6 @@ func (c *defaultPolicy) process() {
 
 func (c *defaultPolicy) pushLfu(keys []uint64) {
 	if len(keys) > 0 {
-		//fmt.Printf("[policy] 异步发送访问记录:%d\n", len(keys))
 		c.access <- keys
 	}
 }
