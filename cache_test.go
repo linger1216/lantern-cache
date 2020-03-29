@@ -1,6 +1,7 @@
 package lantern
 
 import (
+	"fmt"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
@@ -81,7 +82,14 @@ func TestCache_PutGetRandom(t *testing.T) {
 	c := NewLanternCache(&Config{
 		MaxCost: 1024 * 1024 * 1024,
 		AvgCost: 1024,
+		Stats:   true,
 	})
+
+	go func() {
+		for {
+			fmt.Println(c.Stats())
+		}
+	}()
 
 	expire := 10 * time.Millisecond
 

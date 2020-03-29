@@ -66,3 +66,11 @@ type bigEntry struct {
 
 type OnEvictFunc func(hashed, conflict uint64, val interface{})
 type CostFunc func(value interface{}) (cost int64)
+
+type Stats struct {
+	hit   uint64
+	miss  uint64
+	key   uint64
+	evict uint64
+	drop  uint64
+}

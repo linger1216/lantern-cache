@@ -10,10 +10,8 @@ type defaultPolicy struct {
 	sync.RWMutex
 	coster  *coster
 	tinyLfu *tinyLfu
-
-	// 异步为了性能
-	access chan []uint64
-	stop   chan struct{}
+	access  chan []uint64
+	stop    chan struct{}
 }
 
 func newDefaultPolicy(maxKeyCount, maxCost uint64) *defaultPolicy {

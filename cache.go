@@ -30,6 +30,9 @@ type Config struct {
 	CostFunc CostFunc
 	// debug所用
 	Log bool
+
+	// Stats 所用
+	Stats bool
 }
 
 func (c *Config) defaultValue() {
@@ -76,6 +79,7 @@ type Cache struct {
 	onEvict          OnEvictFunc
 	costFunc         CostFunc
 	logger           Logger
+	stats            *metrics
 }
 
 func NewLanternCache(conf *Config) *Cache {
@@ -96,6 +100,10 @@ func NewLanternCache(conf *Config) *Cache {
 		c.hasher = newMemXX()
 	default:
 		c.hasher = newFnvXX()
+	}
+
+	if conf.Stats {
+		c.stats = newStats()
 	}
 
 	c.policy = newDefaultPolicy(conf.MaxKeyCount, conf.MaxCost)
@@ -164,6 +172,9 @@ func (c *Cache) _save(bigEntry *bigEntry) {
 	}
 
 	if saved {
+		if c.stats != nil {
+			c.stats.key.add(1)
+		}
 		c.store.Put(bigEntry.entry)
 	}
 
@@ -176,12 +187,24 @@ func (c *Cache) _save(bigEntry *bigEntry) {
 			c.onEvict(entry.hashed, entry.conflict, entry.value)
 		}
 	}
+
+	if c.stats != nil && len(evicts) > 0 {
+		c.stats.evict.add(uint64(len(evicts)))
+	}
 }
 
 func (c *Cache) Get(key interface{}) (interface{}, bool) {
 	keyHash, conflict := c.hasher.hash(key)
 	c.accessRingBuffer.put(keyHash)
-	return c.store.Get(keyHash, conflict)
+	val, ok := c.store.Get(keyHash, conflict)
+	if c.stats != nil {
+		if ok {
+			c.stats.hit.add(1)
+		} else {
+			c.stats.miss.add(1)
+		}
+	}
+	return val, ok
 }
 
 func (c *Cache) Put(key interface{}, value interface{}, cost int64) bool {
@@ -209,42 +232,52 @@ func (c *Cache) PutWithTTL(key interface{}, value interface{}, cost int64, ttl t
 		cost:  cost,
 	}
 
-	//c.putEntryChannel <- entry
-	//return true
-
 	select {
 	case c.putEntryChannel <- entry:
 		return true
 	default:
+		if c.stats != nil {
+			c.stats.drop.add(1)
+		}
 		return false
 	}
 }
 
-func (c *Cache) PutSync(key interface{}, value interface{}, cost int64) bool {
-	return c.PutWithTTLSync(key, value, cost, 0)
+func (c *Cache) Stats() Stats {
+	return Stats{
+		hit:   c.stats.hit.get(),
+		miss:  c.stats.miss.get(),
+		key:   c.stats.key.get(),
+		evict: c.stats.evict.get(),
+		drop:  c.stats.drop.get(),
+	}
 }
 
-func (c *Cache) PutWithTTLSync(key interface{}, value interface{}, cost int64, ttl time.Duration) bool {
-	if c == nil || key == nil || ttl < 0 || cost < 0 {
-		return false
-	}
-
-	var expiration time.Time
-	switch {
-	case ttl == 0:
-		break
-	case ttl < 0:
-		return false
-	default:
-		expiration = time.Now().Add(ttl)
-	}
-
-	entry := &bigEntry{
-		entry: &entry{value: value, expiration: expiration},
-		key:   key,
-		cost:  cost,
-	}
-
-	c._save(entry)
-	return true
-}
+//func (c *Cache) PutSync(key interface{}, value interface{}, cost int64) bool {
+//	return c.PutWithTTLSync(key, value, cost, 0)
+//}
+//
+//func (c *Cache) PutWithTTLSync(key interface{}, value interface{}, cost int64, ttl time.Duration) bool {
+//	if c == nil || key == nil || ttl < 0 || cost < 0 {
+//		return false
+//	}
+//
+//	var expiration time.Time
+//	switch {
+//	case ttl == 0:
+//		break
+//	case ttl < 0:
+//		return false
+//	default:
+//		expiration = time.Now().Add(ttl)
+//	}
+//
+//	entry := &bigEntry{
+//		entry: &entry{value: value, expiration: expiration},
+//		key:   key,
+//		cost:  cost,
+//	}
+//
+//	c._save(entry)
+//	return true
+//}

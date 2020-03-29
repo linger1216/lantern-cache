@@ -32,26 +32,20 @@ func (p *variable) get() uint64 {
 	return atomic.LoadUint64(p.val)
 }
 
-type stats struct {
-	hit       *variable
-	miss      *variable
-	keyAdd    *variable
-	keyUpdate *variable
-	keyEvict  *variable
-	costAdd   *variable
-	costEvict *variable
-	rejects   *variable
+type metrics struct {
+	hit   *variable
+	miss  *variable
+	key   *variable
+	evict *variable
+	drop  *variable
 }
 
-func newStats() *stats {
-	ret := &stats{}
+func newStats() *metrics {
+	ret := &metrics{}
 	ret.hit = newVariable()
 	ret.miss = newVariable()
-	ret.keyAdd = newVariable()
-	ret.keyUpdate = newVariable()
-	ret.keyEvict = newVariable()
-	ret.costAdd = newVariable()
-	ret.costEvict = newVariable()
-	ret.rejects = newVariable()
+	ret.key = newVariable()
+	ret.evict = newVariable()
+	ret.drop = newVariable()
 	return ret
 }
