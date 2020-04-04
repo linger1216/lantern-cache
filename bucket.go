@@ -2,6 +2,7 @@ package lantern_cache
 
 import (
 	"bytes"
+	"fmt"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -71,6 +72,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 		atomic.AddUint64(&b.statistics.Errors, 1)
 		return ErrorInvalidEntry
 	}
+
 	offset := b.offset
 	nextOffset := offset + entrySize
 	chunkIndex := offset / chunkSize
@@ -79,7 +81,7 @@ func (b *bucket) put(keyHash uint64, key, val []byte, expire int64) error {
 	if nextChunkIndex > chunkIndex {
 		if int(nextChunkIndex) >= len(b.chunks) {
 			b.loop++
-			//fmt.Printf("chunk(%v) need loop:%d offset:%d nextOffset:%d chunkIndex:%d nextChunkIndex:%d len(b.chunks):%d\n", &b, b.loop, offset, nextOffset, chunkIndex, nextChunkIndex, len(b.chunks))
+			fmt.Printf("chunk(%v) need loop:%d offset:%d nextOffset:%d chunkIndex:%d nextChunkIndex:%d len(b.chunks):%d\n", &b, b.loop, offset, nextOffset, chunkIndex, nextChunkIndex, len(b.chunks))
 			chunkIndex = 0
 			offset = 0
 		} else {
@@ -170,6 +172,12 @@ func (b *bucket) clean() {
 	b.mutex.Unlock()
 }
 
+func (b *bucket) size() int {
+	b.mutex.Lock()
+	defer b.mutex.Unlock()
+	return len(b.m)
+}
+
 func (b *bucket) del(keyHash uint64) {
 	b.mutex.Lock()
 	defer b.mutex.Unlock()
@@ -208,4 +216,28 @@ func (b *bucket) stats() (uint64, uint64, uint64, uint64) {
 		}
 	}
 	return uint64(len(b.m)), uint64(len(b.m) * 16), size, uint64(len(b.chunks)) * chunkSize
+}
+
+func (b *bucket) scan(count int) ([][]byte, error) {
+	b.mutex.RLock()
+	defer b.mutex.RUnlock()
+	ret := make([][]byte, 0, count)
+	i := 0
+	for _, v := range b.m {
+		i++
+		if i > count {
+			break
+		}
+		loop := uint32(v >> OffsetSizeOf)
+		offset := v & 0x000000ffffffffff
+		if loop == b.loop && offset < b.offset || (loop+1 == b.loop && offset >= b.offset) {
+			chunkIndex := offset / chunkSize
+			if int(chunkIndex) < len(b.chunks) {
+				chunkOffset := offset & (chunkSize - 1)
+				readKey := readKey(b.chunks[chunkIndex][chunkOffset:])
+				ret = append(ret, readKey)
+			}
+		}
+	}
+	return ret, nil
 }

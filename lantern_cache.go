@@ -125,6 +125,27 @@ func (lc *LanternCache) Stats() *Stats {
 	return lc.stats
 }
 
+func (lc *LanternCache) Size() uint64 {
+	ret := uint64(0)
+	for i := range lc.buckets {
+		ret += uint64(lc.buckets[i].size())
+	}
+	return ret
+}
+
+func (lc *LanternCache) Scan(count int) ([][]byte, error) {
+	ret := make([][]byte, 0, count)
+	for i := range lc.buckets {
+		if data, err := lc.buckets[i].scan(count); err == nil && len(data) > 0 {
+			ret = append(ret, data...)
+		}
+		if len(ret) >= count {
+			break
+		}
+	}
+	return ret, nil
+}
+
 func (lc *LanternCache) String() string {
 	var mapLen, mapSize, chunkSize, maxChunkSize uint64
 	var bucketMinMapLen, bucketMaxMapLen uint64

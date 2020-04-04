@@ -8,4 +8,5 @@ require (
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/pkg/profile v1.4.0
 	github.com/tevjef/go-runtime-metrics v0.0.0-20170326170900-527a54029307
+	github.com/tidwall/redcon v1.3.2
 )
