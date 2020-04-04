@@ -26,7 +26,7 @@ type bucket struct {
 }
 
 func newBucket(cfg *bucketConfig) *bucket {
-	assert(cfg.maxCapacity > 0, "bucket max capacity need > 0")
+	ensure(cfg.maxCapacity > 0, "bucket max capacity need > 0")
 	if cfg.initCapacity == 0 {
 		cfg.initCapacity = cfg.maxCapacity / 4
 	}
@@ -34,7 +34,7 @@ func newBucket(cfg *bucketConfig) *bucket {
 	ret.statistics = cfg.statistics
 
 	needChunkCount := (cfg.maxCapacity + chunkSize - 1) / chunkSize
-	assert(needChunkCount > 0, "max bucket chunk count need > 0")
+	ensure(needChunkCount > 0, "max bucket chunk count need > 0")
 
 	initChunkCount := (cfg.initCapacity + chunkSize - 1) / chunkSize
 	if initChunkCount == 0 {

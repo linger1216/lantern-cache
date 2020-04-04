@@ -20,7 +20,7 @@ func wrapEntry(blob []byte, timestamp int64, key, val []byte) []byte {
 	if blob == nil {
 		blob = make([]byte, size)
 	}
-	assert(cap(blob) >= size, "wrapEntry blob size need bigger than entry marshal")
+	ensure(cap(blob) >= size, "wrapEntry blob size need bigger than entry marshal")
 	pos := 0
 
 	binary.LittleEndian.PutUint64(blob[pos:pos+EntryTimeStampFieldSizeOf], uint64(timestamp))
