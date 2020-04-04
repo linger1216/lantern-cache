@@ -144,7 +144,7 @@ func (r *RedisServer) ListenAndServe() error {
 			}
 		},
 		func(conn redcon.Conn) bool {
-			fmt.Printf("accept: %s\n", conn.RemoteAddr())
+			//fmt.Printf("accept: %s\n", conn.RemoteAddr())
 			return true
 		},
 		func(conn redcon.Conn, err error) {
